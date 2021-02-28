@@ -3,6 +3,8 @@ import time
 
 import email
 
+import shutil
+
 from daemonize import Daemonize
 
 USER_DIR = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
@@ -44,3 +46,4 @@ for filename in os.listdir(INBOX_DIR):
             if sender not in domain_list:
                 # Move the email from Inbox mailbox to New Sender mailbox
                 print(f"Sender address not recognized, now moving email from {INBOX_MAILBOX} to {NEW_SENDER_MAILBOX}")
+                shutil.move(filepath, os.path.join(NEW_SENDER_DIR, filename))
