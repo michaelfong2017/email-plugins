@@ -7,7 +7,9 @@ from daemonize import Daemonize
 
 USER_DIR = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 INBOX_DIR = os.path.join(USER_DIR, 'cur')
-NEW_USER_DIR = os.path.join(USER_DIR, '.INBOX.New Sender', 'cur')
+INBOX_MAILBOX = '.INBOX'
+NEW_SENDER_MAILBOX = '.INBOX.New Sender'
+NEW_SENDER_DIR = os.path.join(USER_DIR, NEW_SENDER_MAILBOX, 'cur')
 DOMAIN_FILE = "domain.txt"
 
 ## Control which emails (files) to check
@@ -16,13 +18,15 @@ CHECK_EMAILS_MODIFIED_WITHIN = 20 # Check all emails that are last modified with
 
 with open(DOMAIN_FILE, "r") as f:
     domain_list = f.readlines()
-print(domain_list)
+print(f"Recognized domain list from {DOMAIN_FILE}: {domain_list}")
 
 for filename in os.listdir(INBOX_DIR):
     filepath = os.path.join(INBOX_DIR, filename)
     mtime = os.stat(filepath).st_mtime
 
     if CHECK_ALL_EMAILS == True or time.time() - mtime < CHECK_EMAILS_MODIFIED_WITHIN: # Check this email (file)
+
+        print(f"Checking email {filename}")
 
         with open(filepath, "r") as f:
             msg = email.message_from_file(f) # Whole email message including both headers and content
@@ -35,8 +39,8 @@ for filename in os.listdir(INBOX_DIR):
 
             sender = headers['From']
 
-            print(sender)
+            print(f"From: {sender}")
 
             if sender not in domain_list:
                 # Move the email from Inbox mailbox to New Sender mailbox
-                print("not in")
+                print(f"Sender address not recognized, now moving email from {INBOX_MAILBOX} to {NEW_SENDER_MAILBOX}")
