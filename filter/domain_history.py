@@ -2,6 +2,7 @@ import os
 import time
 
 import email
+import re
 
 import shutil
 
@@ -40,6 +41,10 @@ for filename in os.listdir(INBOX_DIR):
             #     print(h)
 
             sender = headers['From']
+
+            m = re.search(r"\<(.*?)\>", sender) # In case sender is something like '"Chan, Tai Man" <ctm@gmail.com>' instead of 'ctm@gmail.com'
+            if m != None:
+                sender = m.group(1)
 
             print(f"From: {sender}")
 
