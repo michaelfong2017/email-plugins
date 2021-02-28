@@ -7,4 +7,5 @@ USER_DIR = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__fil
 INBOX_DIR = os.path.join(USER_DIR, 'cur')
 NEW_USER_DIR = os.path.join(USER_DIR, '.INBOX.New Sender', 'cur')
 
-print(os.listdir(NEW_USER_DIR))
+for filename in os.listdir(INBOX_DIR):
+    print(os.stat_result(filename).st_mtime)
