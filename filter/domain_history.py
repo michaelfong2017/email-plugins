@@ -19,7 +19,7 @@ CHECK_ALL_EMAILS = True
 CHECK_EMAILS_MODIFIED_WITHIN = 20 # Check all emails that are last modified within t seconds
 
 with open(DOMAIN_FILE, "r") as f:
-    domain_list = f.readlines()
+    domain_list = f.read().splitlines()
 print(f"Recognized domain list from {DOMAIN_FILE}: {domain_list}")
 
 for filename in os.listdir(INBOX_DIR):
@@ -47,3 +47,5 @@ for filename in os.listdir(INBOX_DIR):
                 # Move the email from Inbox mailbox to New Sender mailbox
                 print(f"Sender address not recognized, now moving email from {INBOX_MAILBOX} to {NEW_SENDER_MAILBOX}")
                 shutil.move(filepath, os.path.join(NEW_SENDER_DIR, filename))
+            else:
+                print("Sender address recognized")
