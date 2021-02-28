@@ -27,4 +27,4 @@ for filename in os.listdir(INBOX_DIR):
             headers = parser.parsestr(msg.as_string())
 
             for h in headers.items():
-                print h
+                print(h)
