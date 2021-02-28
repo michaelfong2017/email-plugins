@@ -8,4 +8,6 @@ INBOX_DIR = os.path.join(USER_DIR, 'cur')
 NEW_USER_DIR = os.path.join(USER_DIR, '.INBOX.New Sender', 'cur')
 
 for filename in os.listdir(INBOX_DIR):
+    if filename.startswith("'") and filename.endswith("'"):
+        filename = filename.split("'")[1]
     print(os.stat(filename).st_mtime)
