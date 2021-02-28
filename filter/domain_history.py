@@ -1,6 +1,8 @@
 import os
 import time
 
+import email
+
 from daemonize import Daemonize
 
 USER_DIR = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
@@ -18,5 +20,11 @@ for filename in os.listdir(INBOX_DIR):
     if CHECK_ALL_EMAILS == True or time.time() - mtime < CHECK_EMAILS_MODIFIED_WITHIN: # Check this email (file)
 
         with open(filepath, "r") as f:
-            for line in f.readlines():
-                print(line)
+            msg = email.message_from_file(f)
+            print(msg)
+
+            parser = email.parser.HeaderParser()
+            headers = parser.parsestr(msg.as_string())
+
+            for h in headers.items():
+                print h
