@@ -6,6 +6,7 @@ import re
 
 import shutil
 
+import logging
 from daemonize import Daemonize
 
 USER_DIR = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
@@ -19,10 +20,21 @@ DOMAIN_FILE = "domain.txt"
 CHECK_ALL_EMAILS = True
 CHECK_EMAILS_MODIFIED_WITHIN = 20 # Check all emails that are last modified within t seconds
 
-PID = "process.pid"
+## Daemonize
+pid = "process.pid"
+logger = logging.getLogger(__name__)
+logger.setLevel(logging.DEBUG)
+logger.propagate = False
+fh = logging.FileHandler("process.log", "w")
+fh.setLevel(logging.DEBUG)
+logger.addHandler(fh)
+keep_fds = [fh.stream.fileno()]
 
 def main():
+    logger.debug("Start")
     while True:
+        logger.debug("Loop")
+
         with open(DOMAIN_FILE, "r") as f:
             domain_list = f.read().splitlines()
         print(f"Recognized domain list from {DOMAIN_FILE}: {domain_list}")
@@ -59,9 +71,9 @@ def main():
                     else:
                         print("Sender address recognized")
 
-        sleep(5)
+        sleep(10)
 
-daemon = Daemonize(app="domain_history", pid=PID, action=main)
+daemon = Daemonize(app="domain_history", pid=pid, action=main, keep_fds=keep_fds)
 daemon.start()
 
 
