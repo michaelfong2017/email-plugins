@@ -22,6 +22,7 @@ CHECK_EMAILS_MODIFIED_WITHIN = 20 # Check all emails that are last modified with
 
 ## Daemonize
 pid = "process.pid"
+logging.basicConfig(format='%(asctime)s - %(levelname)s - %(message)s') # <--- required, or I don't get any log messages
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.DEBUG)
 logger.propagate = False
@@ -37,7 +38,7 @@ def main():
 
         with open(DOMAIN_FILE, "r") as f:
             domain_list = f.read().splitlines()
-        print(f"Recognized domain list from {DOMAIN_FILE}: {domain_list}")
+        logger.debug(f"Recognized domain list from {DOMAIN_FILE}: {domain_list}")
 
         for filename in os.listdir(INBOX_DIR):
             filepath = os.path.join(INBOX_DIR, filename)
@@ -45,7 +46,7 @@ def main():
 
             if CHECK_ALL_EMAILS == True or time.time() - mtime < CHECK_EMAILS_MODIFIED_WITHIN: # Check this email (file)
 
-                print(f"Checking email {filename}")
+                logger.debug(f"Checking email {filename}")
 
                 with open(filepath, "r") as f:
                     msg = email.message_from_file(f) # Whole email message including both headers and content
@@ -62,16 +63,16 @@ def main():
                     if m != None:
                         sender = m.group(1)
 
-                    print(f"From: {sender}")
+                    logger.debug(f"From: {sender}")
 
                     if sender not in domain_list:
                         # Move the email from Inbox mailbox to New Sender mailbox
                         print(f"Sender address not recognized, now moving email from {INBOX_MAILBOX} to {NEW_SENDER_MAILBOX}")
                         shutil.move(filepath, os.path.join(NEW_SENDER_DIR, filename))
                     else:
-                        print("Sender address recognized")
+                        logger.debug("Sender address recognized")
 
-        time.sleep(5)
+        time.sleep(10)
 
 daemon = Daemonize(app="domain_history", pid=pid, action=main, logger=logger, keep_fds=keep_fds)
 daemon.start()
