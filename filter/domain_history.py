@@ -36,7 +36,7 @@ keep_fds = [fh.stream.fileno()]
 
 def main():
     while True:
-        logger.info("Fetching Inbox...")
+        logger.info("Fetching Inbox")
 
         with open(os.path.join(THIS_DIR, DOMAIN_FILE), "r") as f:
             domain_list = f.read().splitlines()
@@ -48,7 +48,7 @@ def main():
 
             if CHECK_ALL_EMAILS == True or time.time() - mtime < CHECK_EMAILS_MODIFIED_WITHIN: # Check this email (file)
 
-                logger.info(f"Checking email {filename}...")
+                logger.info(f"Checking email {filename}")
 
                 with open(filepath, "r") as f:
                     msg = email.message_from_file(f) # Whole email message including both headers and content
@@ -74,7 +74,7 @@ def main():
                     else:
                         logger.info("Sender address recognized")
 
-        logger.info("Now sleep for {SLEEP_DURATION} seconds")
+        logger.info(f"Now sleep for {SLEEP_DURATION} seconds")
         time.sleep(SLEEP_DURATION)
 
 daemon = Daemonize(app="domain_history", pid=pid, action=main, logger=logger, keep_fds=keep_fds)
