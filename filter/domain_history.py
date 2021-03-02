@@ -73,6 +73,13 @@ def main():
 
                     sender = headers['From']
 
+                    ## Add banner to Subject
+                    subject = headers['Subject']
+                    if subject.startswith('[FROM NEW SENDER] '):
+                        pass
+                    else:
+                        headers['Subject'] = "[FROM NEW SENDER] " + subject
+
                     m = re.search(r"\<(.*?)\>", sender) # In case sender is something like '"Chan, Tai Man" <ctm@gmail.com>' instead of 'ctm@gmail.com'
                     if m != None:
                         sender = m.group(1)
@@ -80,7 +87,7 @@ def main():
                     logger.info(f"From: {sender}")
 
                     if sender not in domain_list:
-                        # Move the email from Inbox mailbox to New Sender mailbox
+                        ## Move the email from Inbox mailbox to New Sender mailbox
                         logger.info(f"Sender address not recognized, now move email from {INBOX_MAILBOX} to {NEW_SENDER_MAILBOX}")
                         shutil.move(filepath, os.path.join(NEW_SENDER_DIR, filename))
                     else:
