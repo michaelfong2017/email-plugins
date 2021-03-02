@@ -20,26 +20,27 @@ DOMAIN_FILE = "domain.txt"
 ## Control which emails (files) to check
 CHECK_ALL_EMAILS = True
 CHECK_EMAILS_MODIFIED_WITHIN = 20 # Check all emails that are last modified within t seconds
+SLEEP_DURATION = 10 # second
 
 ## Daemonize
 pid = "process.pid"
-logging.basicConfig(format='%(asctime)s - %(levelname)s - %(message)s') # <--- required, or I don't get any log messages
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.DEBUG)
 logger.propagate = False
 fh = logging.FileHandler("process.log", "w")
 fh.setLevel(logging.DEBUG)
+formatter = logging.Formatter('%(asctime)s - %(levelname)s - %(message)s')
+fh.setFormatter(formatter)
 logger.addHandler(fh)
 keep_fds = [fh.stream.fileno()]
 
 def main():
-    logger.debug("Start")
     while True:
-        logger.debug("Loop")
+        logger.info("Fetching Inbox...")
 
         with open(os.path.join(THIS_DIR, DOMAIN_FILE), "r") as f:
             domain_list = f.read().splitlines()
-        logger.debug(f"Recognized domain list from {DOMAIN_FILE}: {domain_list}")
+        logger.info(f"Recognized domain list from {DOMAIN_FILE}: {domain_list}")
 
         for filename in os.listdir(INBOX_DIR):
             filepath = os.path.join(INBOX_DIR, filename)
@@ -47,7 +48,7 @@ def main():
 
             if CHECK_ALL_EMAILS == True or time.time() - mtime < CHECK_EMAILS_MODIFIED_WITHIN: # Check this email (file)
 
-                logger.debug(f"Checking email {filename}")
+                logger.info(f"Checking email {filename}...")
 
                 with open(filepath, "r") as f:
                     msg = email.message_from_file(f) # Whole email message including both headers and content
@@ -64,16 +65,17 @@ def main():
                     if m != None:
                         sender = m.group(1)
 
-                    logger.debug(f"From: {sender}")
+                    logger.info(f"From: {sender}")
 
                     if sender not in domain_list:
                         # Move the email from Inbox mailbox to New Sender mailbox
-                        print(f"Sender address not recognized, now moving email from {INBOX_MAILBOX} to {NEW_SENDER_MAILBOX}")
+                        print(f"Sender address not recognized, now move email from {INBOX_MAILBOX} to {NEW_SENDER_MAILBOX}")
                         shutil.move(filepath, os.path.join(NEW_SENDER_DIR, filename))
                     else:
-                        logger.debug("Sender address recognized")
+                        logger.info("Sender address recognized")
 
-        time.sleep(10)
+        logger.info("Now sleep for {SLEEP_DURATION} seconds")
+        time.sleep(SLEEP_DURATION)
 
 daemon = Daemonize(app="domain_history", pid=pid, action=main, logger=logger, keep_fds=keep_fds)
 daemon.start()
