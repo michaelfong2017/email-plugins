@@ -71,7 +71,7 @@ def main():
                     else:
                         print("Sender address recognized")
 
-        sleep(10)
+        time.sleep(5)
 
 daemon = Daemonize(app="domain_history", pid=pid, action=main, keep_fds=keep_fds)
 daemon.start()
