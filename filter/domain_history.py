@@ -9,6 +9,7 @@ import shutil
 import logging
 from daemonize import Daemonize
 
+THIS_DIR = os.path.dirname(os.path.abspath(__file__))
 USER_DIR = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 INBOX_DIR = os.path.join(USER_DIR, 'cur')
 INBOX_MAILBOX = '.INBOX'
@@ -36,7 +37,7 @@ def main():
     while True:
         logger.debug("Loop")
 
-        with open(DOMAIN_FILE, "r") as f:
+        with open(os.path.join(THIS_DIR, DOMAIN_FILE), "r") as f:
             domain_list = f.read().splitlines()
         logger.debug(f"Recognized domain list from {DOMAIN_FILE}: {domain_list}")
 
