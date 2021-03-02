@@ -73,7 +73,7 @@ def main():
 
         time.sleep(5)
 
-daemon = Daemonize(app="domain_history", pid=pid, action=main, keep_fds=keep_fds)
+daemon = Daemonize(app="domain_history", pid=pid, action=main, logger=logger, keep_fds=keep_fds)
 daemon.start()
 
 
