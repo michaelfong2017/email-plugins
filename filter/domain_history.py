@@ -81,7 +81,7 @@ def main():
 
                     if sender not in domain_list:
                         # Move the email from Inbox mailbox to New Sender mailbox
-                        print(f"Sender address not recognized, now move email from {INBOX_MAILBOX} to {NEW_SENDER_MAILBOX}")
+                        logger.info(f"Sender address not recognized, now move email from {INBOX_MAILBOX} to {NEW_SENDER_MAILBOX}")
                         shutil.move(filepath, os.path.join(NEW_SENDER_DIR, filename))
                     else:
                         logger.info("Sender address recognized")
