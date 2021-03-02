@@ -9,6 +9,14 @@ import shutil
 import logging
 from daemonize import Daemonize
 
+## Handle arguments
+import argparse
+parser = argparse.ArgumentParser()
+parser.add_argument('-d', '--debug', action='store_true', help='Debug level set from logging.WARNING to logging.DEBUG')
+parser.add_argument('-s', '--sleep', help='Daemon process sleep duration (in seconds) between loops')
+args = parser.parse_args()
+
+
 THIS_DIR = os.path.dirname(os.path.abspath(__file__))
 USER_DIR = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 INBOX_DIR = os.path.join(USER_DIR, 'cur')
@@ -20,15 +28,19 @@ DOMAIN_FILE = "domain.txt"
 ## Control which emails (files) to check
 CHECK_ALL_EMAILS = True
 CHECK_EMAILS_MODIFIED_WITHIN = 20 # Check all emails that are last modified within t seconds
-SLEEP_DURATION = 10 # second
+SLEEP_DURATION = args.sleep if args.sleep else 5 # second, default is 5
 
 ## Daemonize
 pid = "process.pid"
 logger = logging.getLogger(__name__)
-logger.setLevel(logging.DEBUG)
+
+if args.debug:
+    logger.setLevel(logging.DEBUG)
+else:
+    logger.setLevel(logging.WARNING)
+
 logger.propagate = False
 fh = logging.FileHandler("process.log", "w")
-fh.setLevel(logging.DEBUG)
 formatter = logging.Formatter('%(asctime)s - %(levelname)s - %(message)s')
 fh.setFormatter(formatter)
 logger.addHandler(fh)
