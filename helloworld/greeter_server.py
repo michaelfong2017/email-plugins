@@ -22,10 +22,31 @@ import helloworld_pb2
 import helloworld_pb2_grpc
 
 
+import os
+BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+DOMAIN_TXT_PATH = os.path.sep.join([BASE_DIR, 'filter', 'domain.txt'])
+
+
 class Greeter(helloworld_pb2_grpc.GreeterServicer):
 
     def SayHello(self, request, context):
-        return helloworld_pb2.HelloReply(message='Hello, %s!' % request.name)
+        if (request.name.startswith('CHECK')):
+            sender_address = request.name.split(':')[1]
+            with open(DOMAIN_TXT_PATH, 'r') as f:
+                all_lines = f.readlines()
+                found = False
+                for line in all_lines:
+                    if line.rstrip('\n') == sender_address:
+                        found = True
+                        break
+                
+                if found:
+                    return helloworld_pb2.HelloReply(message=f'KNOWN {sender_address}')
+                else:
+                    return helloworld_pb2.HelloReply(message=f'UNKNOWN {sender_address}')
+
+
+        return helloworld_pb2.HelloReply(message='INVALID COMMAND')
 
 
 def serve():
