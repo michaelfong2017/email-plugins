@@ -22,29 +22,51 @@ import helloworld_pb2
 import helloworld_pb2_grpc
 
 
+import pickle
+
 import os
 BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-DOMAIN_TXT_PATH = os.path.sep.join([BASE_DIR, 'filter', 'domain.txt'])
+DOMAIN_PKL_PATH = os.path.sep.join([BASE_DIR, 'filter', 'domain.pkl'])
 
+if os.stat(DOMAIN_PKL_PATH).st_size == 0:
+    s = set()
+    with open(DOMAIN_PKL_PATH,'wb') as f:
+        pickle.dump(s, f)
 
 class Greeter(helloworld_pb2_grpc.GreeterServicer):
 
     def SayHello(self, request, context):
         if (request.name.startswith('CHECK')):
             sender_address = request.name.split(':')[1]
-            with open(DOMAIN_TXT_PATH, 'r') as f:
-                all_lines = f.readlines()
-                found = False
-                for line in all_lines:
-                    if line.rstrip('\n') == sender_address:
-                        found = True
-                        break
-                
-                if found:
+            with open(DOMAIN_PKL_PATH, 'rb') as f:
+                domain_set = pickle.load(f)
+                if sender_address in domain_set:
                     return helloworld_pb2.HelloReply(message=f'KNOWN {sender_address}')
                 else:
                     return helloworld_pb2.HelloReply(message=f'UNKNOWN {sender_address}')
+        
+        elif (request.name.startswith('SETKNOWN')):
+            sender_addresses = request.name.split(':')[1].split(';')
 
+            domain_set = set()
+            with open(DOMAIN_PKL_PATH,'rb') as f:
+                domain_set = pickle.load(f)
+            for address in sender_addresses:
+                domain_set.add(address)
+            with open(DOMAIN_PKL_PATH,'wb') as f:
+                pickle.dump(domain_set, f)
+
+        elif (request.name.startswith('SETUNKNOWN')):
+            sender_addresses = request.name.split(':')[1].split(';')
+            
+            domain_set = set()
+            with open(DOMAIN_PKL_PATH,'rb') as f:
+                domain_set = pickle.load(f)
+            for address in sender_addresses:
+                if address in domain_set:
+                    domain_set.remove(address)
+            with open(DOMAIN_PKL_PATH,'wb') as f:
+                pickle.dump(domain_set, f)
 
         return helloworld_pb2.HelloReply(message='INVALID COMMAND')
 
