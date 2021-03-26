@@ -28,7 +28,7 @@ import os
 BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 DOMAIN_PKL_PATH = os.path.sep.join([BASE_DIR, 'filter', 'domain.pkl'])
 
-if os.stat(DOMAIN_PKL_PATH).st_size == 0:
+if not os.path.isfile(DOMAIN_PKL_PATH) or os.stat(DOMAIN_PKL_PATH).st_size == 0:
     s = set()
     with open(DOMAIN_PKL_PATH,'wb') as f:
         pickle.dump(s, f)
