@@ -22,51 +22,57 @@ import helloworld_pb2
 import helloworld_pb2_grpc
 
 
-import pickle
+import psycopg2
 
-import os
-BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-DOMAIN_PKL_PATH = os.path.sep.join([BASE_DIR, 'filter', 'domain.pkl'])
+import datetime
 
-if not os.path.isfile(DOMAIN_PKL_PATH) or os.stat(DOMAIN_PKL_PATH).st_size == 0:
-    s = set()
-    with open(DOMAIN_PKL_PATH,'wb') as f:
-        pickle.dump(s, f)
 
 class Greeter(helloworld_pb2_grpc.GreeterServicer):
 
     def SayHello(self, request, context):
-        if (request.name.startswith('CHECK')):
+        if request.name.startswith('CHECK') or request.name.startswith('SETKNOWN') or request.name.startswith('SETUNKNOWN'):
             sender_address = request.name.split(':')[1]
-            with open(DOMAIN_PKL_PATH, 'rb') as f:
-                domain_set = pickle.load(f)
-                if sender_address in domain_set:
-                    return helloworld_pb2.HelloReply(message=f'KNOWN {sender_address}')
-                else:
-                    return helloworld_pb2.HelloReply(message=f'UNKNOWN {sender_address}')
-        
-        elif (request.name.startswith('SETKNOWN')):
-            sender_addresses = request.name.split(':')[1].split(';')
 
-            domain_set = set()
-            with open(DOMAIN_PKL_PATH,'rb') as f:
-                domain_set = pickle.load(f)
-            for address in sender_addresses:
-                domain_set.add(address)
-            with open(DOMAIN_PKL_PATH,'wb') as f:
-                pickle.dump(domain_set, f)
+            try:
+                if conn.closed:
+                    connect_db()
+            except NameError:
+                connect_db()
 
-        elif (request.name.startswith('SETUNKNOWN')):
-            sender_addresses = request.name.split(':')[1].split(';')
-            
-            domain_set = set()
-            with open(DOMAIN_PKL_PATH,'rb') as f:
-                domain_set = pickle.load(f)
-            for address in sender_addresses:
-                if address in domain_set:
-                    domain_set.remove(address)
-            with open(DOMAIN_PKL_PATH,'wb') as f:
-                pickle.dump(domain_set, f)
+            start_time = datetime.datetime.now()
+            try:
+                with conn.cursor() as cursor:
+
+                    if request.name.startswith('CHECK'):
+                        cursor.execute(f'SELECT count(*) FROM known_sender WHERE address = \'{sender_address}\'')
+                        records = cursor.fetchall()
+
+                        match_count = records[0][0]
+                        logger.info(f'match_count is {match_count}')
+    
+                        cursor.close()
+    
+                        logger.info(f'Time elapsed for fetching records: {datetime.datetime.now() - start_time}')
+    
+                        if match_count == 0:
+                            return helloworld_pb2.HelloReply(message=f'UNKNOWN {sender_address}')
+                        else:
+                            return helloworld_pb2.HelloReply(message=f'KNOWN {sender_address}')
+
+                    elif request.name.startswith('SETKNOWN'):
+                        cursor.execute(f'INSERT INTO known_sender VALUES (\'{sender_address}\')')
+                        cursor.close()
+                        conn.commit()
+
+                    elif request.name.startswith('SETUNKNOWN'):
+                        cursor.execute(f'DELETE FROM known_sender WHERE address = \'{sender_address}\'')
+                        cursor.close()
+                        conn.commit()
+
+            finally:
+                if conn:
+                    if datetime.datetime.now() - datetime.timedelta(seconds=1800) > connect_db_time:
+                        conn.close()
 
         return helloworld_pb2.HelloReply(message='INVALID COMMAND')
 
@@ -78,7 +84,35 @@ def serve():
     server.start()
     server.wait_for_termination()
 
+def create_logger():
+    global logger
+
+    logging.basicConfig()
+    logger = logging.getLogger(__name__)
+    logger.setLevel(logging.DEBUG)
+
+    if not len(logger.handlers) == 0:
+        logger.handlers.clear()
+
+    formatter = logging.Formatter('%(asctime)s - %(levelname)s - %(message)s')
+    fh = logging.FileHandler('console.log', mode='w', encoding='utf-8')
+    fh.setLevel(logging.DEBUG)
+    fh.setFormatter(formatter)
+    logger.addHandler(fh)   
+
+def connect_db():
+    global conn
+
+    start_time = datetime.datetime.now()
+    try:
+        conn = psycopg2.connect("dbname='eguard' user='eguard_admin' host='dev.clo3yq4mhvjy.ap-east-1.rds.amazonaws.com' password='eguardbymichael'")
+    except:
+        logger.error("I am unable to connect to the database")
+
+    global connect_db_time
+    connect_db_time = datetime.datetime.now()
+    logger.info(f'Time elapsed for connecting to the database: {datetime.datetime.now() - start_time}')
 
 if __name__ == '__main__':
-    logging.basicConfig()
+    create_logger()
     serve()

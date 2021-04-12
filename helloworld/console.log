@@ -1,0 +1,20 @@
+2021-04-12 09:39:47,762 - INFO - Time elapsed for connecting to the database: 0:00:04.068411
+2021-04-12 09:39:47,864 - INFO - match_count is 0
+2021-04-12 09:39:47,865 - INFO - Time elapsed for fetching records: 0:00:00.102687
+2021-04-12 09:39:54,405 - INFO - match_count is 1
+2021-04-12 09:39:54,406 - INFO - Time elapsed for fetching records: 0:00:00.051220
+2021-04-12 09:39:56,171 - INFO - match_count is 1
+2021-04-12 09:39:56,172 - INFO - Time elapsed for fetching records: 0:00:00.051038
+2021-04-12 09:39:57,740 - INFO - match_count is 0
+2021-04-12 09:39:57,741 - INFO - Time elapsed for fetching records: 0:00:00.051502
+2021-04-12 09:40:10,778 - INFO - match_count is 1
+2021-04-12 09:40:10,779 - INFO - Time elapsed for fetching records: 0:00:00.101851
+2021-04-12 09:40:12,085 - INFO - match_count is 1
+2021-04-12 09:40:12,086 - INFO - Time elapsed for fetching records: 0:00:00.051975
+2021-04-12 09:40:14,038 - INFO - match_count is 1
+2021-04-12 09:40:14,039 - INFO - Time elapsed for fetching records: 0:00:00.051123
+2021-04-12 09:40:19,201 - INFO - match_count is 1
+2021-04-12 09:40:19,202 - INFO - Time elapsed for fetching records: 0:00:00.101969
+2021-04-12 09:40:22,071 - INFO - Time elapsed for connecting to the database: 0:00:01.919443
+2021-04-12 09:40:22,171 - INFO - match_count is 0
+2021-04-12 09:40:22,172 - INFO - Time elapsed for fetching records: 0:00:00.099964
