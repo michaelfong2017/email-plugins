@@ -31,8 +31,6 @@ class Greeter(helloworld_pb2_grpc.GreeterServicer):
 
     def SayHello(self, request, context):
         if request.name.startswith('CHECK') or request.name.startswith('SETKNOWN') or request.name.startswith('SETUNKNOWN'):
-            sender_address = request.name.split(':')[1]
-
             try:
                 if conn.closed:
                     connect_db()
@@ -44,30 +42,50 @@ class Greeter(helloworld_pb2_grpc.GreeterServicer):
                 with conn.cursor() as cursor:
 
                     if request.name.startswith('CHECK'):
-                        cursor.execute(f'SELECT count(*) FROM known_sender WHERE address = \'{sender_address}\'')
-                        records = cursor.fetchall()
+                        sender_address = request.name.split(':')[1]
 
-                        match_count = records[0][0]
-                        logger.info(f'match_count is {match_count}')
-    
-                        cursor.close()
-    
-                        logger.info(f'Time elapsed for fetching records: {datetime.datetime.now() - start_time}')
-    
-                        if match_count == 0:
-                            return helloworld_pb2.HelloReply(message=f'UNKNOWN {sender_address}')
-                        else:
-                            return helloworld_pb2.HelloReply(message=f'KNOWN {sender_address}')
+                        try:
+                            cursor.execute(f'SELECT count(*) FROM known_sender WHERE address = \'{sender_address}\'')
+                            records = cursor.fetchall()
+
+                            match_count = records[0][0]
+                            logger.info(f'match_count is {match_count}')
+
+                            logger.info(f'Time elapsed for fetching records: {datetime.datetime.now() - start_time}')
+
+                            if match_count == 0:
+                                return helloworld_pb2.HelloReply(message=f'UNKNOWN {sender_address}')
+                            else:
+                                return helloworld_pb2.HelloReply(message=f'KNOWN {sender_address}')
+
+                        except Exception as e:
+                            logger.error(f'{e} in CHECK operation for address {sender_address}')
 
                     elif request.name.startswith('SETKNOWN'):
-                        cursor.execute(f'INSERT INTO known_sender VALUES (\'{sender_address}\')')
-                        cursor.close()
-                        conn.commit()
+                        sender_addresses = request.name.split(':')[1].split(';')
+
+                        for address in set(sender_addresses):
+                            try:
+                                cursor.execute(f'INSERT INTO known_sender VALUES (\'{address}\')')
+                                conn.commit()
+                            except Exception as e:
+                                logger.error(f'{e} in SETKNOWN operation for address {address}')
+                                conn.rollback()
+                        
+                        logger.info(f'Time elapsed for inserting records: {datetime.datetime.now() - start_time}')
 
                     elif request.name.startswith('SETUNKNOWN'):
-                        cursor.execute(f'DELETE FROM known_sender WHERE address = \'{sender_address}\'')
-                        cursor.close()
-                        conn.commit()
+                        sender_addresses = request.name.split(':')[1].split(';')
+
+                        for address in set(sender_addresses):
+                            try:
+                                cursor.execute(f'DELETE FROM known_sender WHERE address = \'{address}\'')
+                                conn.commit()
+                            except Exception as e:
+                                logger.error(f'{e} in SETUNKNOWN operation for address {address}')
+                                conn.rollback()
+
+                        logger.info(f'Time elapsed for deleting records: {datetime.datetime.now() - start_time}')
 
             finally:
                 if conn:
