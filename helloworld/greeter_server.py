@@ -30,7 +30,8 @@ import datetime
 class Greeter(helloworld_pb2_grpc.GreeterServicer):
 
     def SayHello(self, request, context):
-        if request.name.startswith('CHECK') or request.name.startswith('SETKNOWN') or request.name.startswith('SETUNKNOWN'):
+        if request.name.startswith('CHECK') or request.name.startswith('SETKNOWN') or request.name.startswith('SETUNKNOWN') \
+        or request.name.startswith('SETJUNK') or request.name.startswith('SETNONJUNK'):
             try:
                 if conn.closed:
                     connect_db()
@@ -86,6 +87,26 @@ class Greeter(helloworld_pb2_grpc.GreeterServicer):
                                 conn.rollback()
 
                         logger.info(f'Time elapsed for deleting records: {datetime.datetime.now() - start_time}')
+
+                    elif request.name.startswith('SETJUNK'):
+                        sender_address = request.name.split(':')[1]
+
+                        try:
+                            cursor.execute(f'INSERT INTO junk_sender VALUES (\'{address}\')')
+                            conn.commit()
+                        except Exception as e:
+                            logger.error(f'{e} in SETJUNK operation for address {address}')
+                            conn.rollback()
+
+                    elif request.name.startswith('SETNONJUNK'):
+                        sender_address = request.name.split(':')[1]
+
+                        try:
+                            cursor.execute(f'DELETE FROM junk_sender WHERE address = \'{address}\'')
+                            conn.commit()
+                        except Exception as e:
+                            logger.error(f'{e} in SETNONJUNK operation for address {address}')
+                            conn.rollback()
 
             finally:
                 if conn:
