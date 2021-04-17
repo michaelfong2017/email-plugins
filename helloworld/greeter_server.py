@@ -52,7 +52,7 @@ class Greeter(helloworld_pb2_grpc.GreeterServicer):
                             match_count = records[0][0]
                             logger.info(f'match_count is {match_count}')
 
-                            logger.info(f'Time elapsed for fetching records: {datetime.datetime.now() - start_time}')
+                            logger.info(f'Time elapsed for CHECK operation: {datetime.datetime.now() - start_time}')
 
                             if match_count == 0:
                                 return helloworld_pb2.HelloReply(message=f'UNKNOWN {sender_address}')
@@ -73,7 +73,7 @@ class Greeter(helloworld_pb2_grpc.GreeterServicer):
                                 logger.error(f'{e} in SETKNOWN operation for address {address}')
                                 conn.rollback()
                         
-                        logger.info(f'Time elapsed for inserting records: {datetime.datetime.now() - start_time}')
+                        logger.info(f'Time elapsed for SETKNOWN operation: {datetime.datetime.now() - start_time}')
 
                     elif request.name.startswith('SETUNKNOWN'):
                         sender_addresses = request.name.split(':')[1].split(';')
@@ -86,7 +86,7 @@ class Greeter(helloworld_pb2_grpc.GreeterServicer):
                                 logger.error(f'{e} in SETUNKNOWN operation for address {address}')
                                 conn.rollback()
 
-                        logger.info(f'Time elapsed for deleting records: {datetime.datetime.now() - start_time}')
+                        logger.info(f'Time elapsed for SETUNKNOWN operation: {datetime.datetime.now() - start_time}')
 
                     elif request.name.startswith('SETJUNK'):
                         sender_address = request.name.split(':')[1]
@@ -98,6 +98,8 @@ class Greeter(helloworld_pb2_grpc.GreeterServicer):
                             logger.error(f'{e} in SETJUNK operation for address {address}')
                             conn.rollback()
 
+                        logger.info(f'Time elapsed for SETJUNK operation: {datetime.datetime.now() - start_time}')
+
                     elif request.name.startswith('SETNONJUNK'):
                         sender_address = request.name.split(':')[1]
 
@@ -107,6 +109,8 @@ class Greeter(helloworld_pb2_grpc.GreeterServicer):
                         except Exception as e:
                             logger.error(f'{e} in SETNONJUNK operation for address {address}')
                             conn.rollback()
+
+                        logger.info(f'Time elapsed for SETNONJUNK operation: {datetime.datetime.now() - start_time}')
 
             finally:
                 if conn:
