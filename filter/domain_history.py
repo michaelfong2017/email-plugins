@@ -25,7 +25,7 @@ args = parser.parse_args()
 THIS_DIR = os.path.dirname(os.path.abspath(__file__))
 ROOT_DIR = os.path.abspath(os.sep)
 MAIL_DIR = os.path.join(ROOT_DIR, 'mailu', 'mail')
-USER_DIRS = next(os.walk(MAIL_DIR))[1]
+USER_DIRS = [f.path for f in os.scandir(MAIL_DIR) if f.is_dir()]
 
 
 ## Control which emails (files) to check
@@ -62,14 +62,10 @@ def connect_db():
     connect_db_time = datetime.datetime.now()
     logger.info(f'Time elapsed for connecting to the database: {datetime.datetime.now() - start_time}')
 
-def modify_userdir(USER_DIR):
-    JUNK_DIR = os.path.join(USER_DIR, '.Junk')
+def init_db():
+    conn.execute('''DROP TABLE known_sender;''')
 
-    start_time = datetime.datetime.now()
-
-    # conn.execute('''DROP TABLE known_sender;''')
-
-    # conn.execute('''CREATE TABLE IF NOT EXISTS known_sender (address TEXT PRIMARY KEY NOT NULL);''')
+    conn.execute('''CREATE TABLE IF NOT EXISTS known_sender (address TEXT PRIMARY KEY NOT NULL);''')
     
     address = "\'admin@michaelfong.co\'"
     try:
@@ -81,12 +77,129 @@ def modify_userdir(USER_DIR):
 
     logger.info(f'Time elapsed for SETKNOWN operation: {datetime.datetime.now() - start_time}')
 
-    _, _, filenames = next(os.walk(os.path.join(USER_DIR, 'cur')))
-    logger.info(filenames)
+def process_userdir(USER_DIR):
+    start_time = datetime.datetime.now()
+
+    INBOX_DIR = os.path.join(USER_DIR, 'cur')
+    logger.info(f"Entering inbox directory {INBOX_DIR}")
+
+    inbox_mails = [f.name for f in os.scandir(os.path.join(USER_DIR, 'cur'))]
+
+    for inbox_mail in inbox_mails:
+        logger.info(f"Checking email {inbox_mail}")
+
+        filepath = os.path.join(INBOX_DIR, inbox_mail)
+
+        flags = inbox_mail.split(',')[-1]
+        if ('S' in flags):
+            # If message is read, mark as recognized in database.
+            with open(filepath, "r+") as f:
+                msg = email.message_from_file(f) # Whole email message including both headers and content
+
+                parser = email.parser.HeaderParser()
+                headers = parser.parsestr(msg.as_string())
+
+                # for h in headers.items(): # Get all header information, this can be commented since we now just need to identify the sender
+                #     print(h)
+
+
+                # Remove banner from Subject if exists
+                subject = headers['Subject']
+                if subject.startswith('[FROM NEW SENDER] '):
+                    headers.replace_header('Subject', subject.replace('[FROM NEW SENDER] ',''))
+                    f.seek(0)
+                    f.write(headers.as_string())
+                    f.truncate()
+                else:
+                    pass
+
+                # Find address from the message
+                sender = headers['From']
+
+                m = re.search(r"\<(.*?)\>", sender) # In case sender is something like '"Chan, Tai Man" <ctm@gmail.com>' instead of 'ctm@gmail.com'
+                if m != None:
+                    sender = m.group(1)
+
+                logger.info(f"Sender of this email: {sender}")
+
+                address = f"\'{sender}\'"
+
+                # Insert the address to database
+                try:
+                    conn.execute(f'''INSERT INTO known_sender (address) VALUES ({address});''')
+                    conn.commit()
+                except Exception as e:
+                    logger.error(f'{e} in SETKNOWN operation for address {address}')
+                    conn.rollback()
+
+            # Rename file
+            new_file_size = os.stat(filepath).st_size
+
+            new_filename = re.sub(r',S=[0-9]*,', f',S={new_file_size},', inbox_mail)
+
+            os.rename(filepath, os.path.join(INBOX_DIR, new_filename))
+
+        else:
+            # If message is unread, add a warning banner to the subject.
+            with open(filepath, "r+") as f:
+                msg = email.message_from_file(f) # Whole email message including both headers and content
+
+                parser = email.parser.HeaderParser()
+                headers = parser.parsestr(msg.as_string())
+
+
+                # Find address from the message
+                sender = headers['From']
+
+                m = re.search(r"\<(.*?)\>", sender) # In case sender is something like '"Chan, Tai Man" <ctm@gmail.com>' instead of 'ctm@gmail.com'
+                if m != None:
+                    sender = m.group(1)
+
+                logger.info(f"Sender of this email: {sender}")
+
+                # Add banner to Subject if record does not exist in database
+                try:
+                    cursor = conn.execute(f'SELECT count(*) FROM known_sender WHERE address = \'{sender}\'')
+                    records = cursor.fetchall()
+
+                    match_count = records[0][0]
+                    logger.info(f'match_count is {match_count}')
+
+                    if match_count == 0:
+                        subject = headers['Subject']
+                        if subject.startswith('[FROM NEW SENDER] '):
+                            pass
+                        else:
+                            headers.replace_header('Subject', "[FROM NEW SENDER] " + subject)
+                            f.seek(0)
+                            f.write(headers.as_string())
+                            f.truncate()
+                    else:
+                        pass
+
+                except Exception as e:
+                    logger.error(f'{e} in CHECK operation for address {sender}')
+
+
+            # Rename file
+            new_file_size = os.stat(filepath).st_size
+            logger.info(new_file_size)
+
+            new_filename = re.sub(r',S=[0-9]*,', f',S={new_file_size},', inbox_mail)
+            logger.info(inbox_mail)
+            logger.info(new_filename)
+
+            os.rename(filepath, os.path.join(INBOX_DIR, new_filename))
+            
+
+    JUNK_DIR = os.path.join(USER_DIR, '.Junk')
+
+    logger.info(f'Time elapsed for processing {USER_DIR}: {datetime.datetime.now() - start_time}')
+
 
 def main():
     connect_db()
-    modify_userdir(USER_DIRS[0])
+    process_userdir(USER_DIRS[0])
     # cursor = conn.execute('''SELECT * FROM untitled_table_1;''')
     # for row in cursor:
     #     print(row)
