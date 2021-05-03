@@ -1,3 +1,6 @@
 filter/env
+filter/domain.db
+filter/process.pid
+filter/process.log
 helloworld/env
 helloworld/console.log
