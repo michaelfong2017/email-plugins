@@ -1,0 +1,12 @@
+2021-05-03 09:16:48,388 - WARNING - Starting daemon.
+2021-05-03 09:16:49,482 - ERROR - UNIQUE constraint failed: known_sender.address in SETKNOWN operation for address 'admin@michaelfong.co'
+2021-05-03 09:16:50,612 - ERROR - Traceback (most recent call last):
+2021-05-03 09:16:50,815 - ERROR -   File "/mailu/plugins/filter/env/lib/python3.7/site-packages/daemonize.py", line 248, in start
+2021-05-03 09:16:51,116 - ERROR -     self.action(*privileged_action_result)
+2021-05-03 09:16:51,370 - ERROR -   File "domain_history.py", line 89, in main
+2021-05-03 09:16:51,648 - ERROR -     modify_userdir(USER_DIRS[0])
+2021-05-03 09:16:52,092 - ERROR -   File "domain_history.py", line 84, in modify_userdir
+2021-05-03 09:16:52,308 - ERROR -     _, _, filenames = next(os.walk(os.path.join(USER_DIR, 'cur')))
+2021-05-03 09:16:52,544 - ERROR - StopIteration
+2021-05-03 09:16:52,776 - ERROR - 
+2021-05-03 09:16:56,863 - WARNING - Stopping daemon.
