@@ -28,10 +28,7 @@ MAIL_DIR = os.path.join(ROOT_DIR, 'mailu', 'mail')
 USER_DIRS = [f.path for f in os.scandir(MAIL_DIR) if f.is_dir()]
 
 
-## Control which emails (files) to check
-CHECK_ALL_EMAILS = True
-CHECK_EMAILS_MODIFIED_WITHIN = 20 # Check all emails that are last modified within t seconds
-SLEEP_DURATION = args.sleep if args.sleep else 5 # second, default is 5
+SLEEP_DURATION = args.sleep if args.sleep else 1 # second, default is 5
 
 ## Daemonize
 pid = "process.pid"
@@ -40,7 +37,10 @@ logger = logging.getLogger(__name__)
 if args.debug:
     logger.setLevel(logging.DEBUG)
 else:
-    logger.setLevel(logging.WARNING)
+    logger.setLevel(logging.CRITICAL)
+
+if not len(logger.handlers) == 0:
+    logger.handlers.clear()
 
 logger.propagate = False
 fh = logging.FileHandler("process.log", "w")
@@ -80,10 +80,13 @@ def init_db():
 def process_userdir(USER_DIR):
     start_time = datetime.datetime.now()
 
+    '''
+    INBOX_DIR
+    '''
     INBOX_DIR = os.path.join(USER_DIR, 'cur')
     logger.info(f"Entering inbox directory {INBOX_DIR}")
 
-    inbox_mails = [f.name for f in os.scandir(os.path.join(USER_DIR, 'cur'))]
+    inbox_mails = [f.name for f in os.scandir(INBOX_DIR)]
 
     for inbox_mail in inbox_mails:
         logger.info(f"Checking email {inbox_mail}")
@@ -183,74 +186,71 @@ def process_userdir(USER_DIR):
 
             # Rename file
             new_file_size = os.stat(filepath).st_size
-            logger.info(new_file_size)
 
             new_filename = re.sub(r',S=[0-9]*,', f',S={new_file_size},', inbox_mail)
-            logger.info(inbox_mail)
-            logger.info(new_filename)
 
             os.rename(filepath, os.path.join(INBOX_DIR, new_filename))
             
 
-    JUNK_DIR = os.path.join(USER_DIR, '.Junk')
+
+    '''
+    JUNK_DIR
+    '''
+    JUNK_DIR = os.path.join(USER_DIR, '.Junk', 'cur')
+    logger.info(f"Entering junk directory {JUNK_DIR}")
+
+    junk_mails = [f.name for f in os.scandir(JUNK_DIR)]
+
+    for junk_mail in junk_mails:
+        logger.info(f"Checking email {junk_mail}")
+
+        filepath = os.path.join(JUNK_DIR, junk_mail)
+
+        with open(filepath, "r") as f:
+            msg = email.message_from_file(f) # Whole email message including both headers and content
+
+            parser = email.parser.HeaderParser()
+            headers = parser.parsestr(msg.as_string())
+
+            # Find address from the message
+            sender = headers['From']
+
+            m = re.search(r"\<(.*?)\>", sender) # In case sender is something like '"Chan, Tai Man" <ctm@gmail.com>' instead of 'ctm@gmail.com'
+            if m != None:
+                sender = m.group(1)
+
+            logger.info(f"Sender of this email: {sender}")
+
+            # Delete the address from database
+            try:
+                conn.execute(f'DELETE FROM known_sender WHERE address = \'{sender}\'')
+                conn.commit()
+            except Exception as e:
+                logger.error(f'{e} in SETUNKNOWN operation for address {sender}')
+                conn.rollback()
 
     logger.info(f'Time elapsed for processing {USER_DIR}: {datetime.datetime.now() - start_time}')
 
 
 def main():
-    connect_db()
-    process_userdir(USER_DIRS[0])
-    # cursor = conn.execute('''SELECT * FROM untitled_table_1;''')
-    # for row in cursor:
-    #     print(row)
-    # while True:
-    #     logger.info("Fetching Inbox")
+    while True:
+        try:
+            conn.execute(f'SELECT count(*) FROM known_sender')
 
-    #     with open(os.path.join(THIS_DIR, DOMAIN_FILE), "r") as f:
-    #         domain_list = f.read().splitlines()
-    #     logger.info(f"Recognized domain list from {DOMAIN_FILE}: {domain_list}")
+        except (NameError, sqlite3.ProgrammingError) as e:
+            logger.error(f'{e}')
+            connect_db()
 
-    #     for filename in os.listdir(INBOX_DIR):
-    #         filepath = os.path.join(INBOX_DIR, filename)
-    #         mtime = os.stat(filepath).st_mtime
+        try:
+            process_userdir(USER_DIRS[0])
 
-    #         if CHECK_ALL_EMAILS == True or time.time() - mtime < CHECK_EMAILS_MODIFIED_WITHIN: # Check this email (file)
+        finally:
+            if conn:
+                if datetime.datetime.now() - datetime.timedelta(seconds=1800) > connect_db_time:
+                    conn.close()
 
-    #             logger.info(f"Checking email {filename}")
-
-    #             with open(filepath, "r") as f:
-    #                 msg = email.message_from_file(f) # Whole email message including both headers and content
-
-    #                 parser = email.parser.HeaderParser()
-    #                 headers = parser.parsestr(msg.as_string())
-
-    #                 # for h in headers.items(): # Get all header information, this can be commented since we now just need to identify the sender
-    #                 #     print(h)
-
-    #                 sender = headers['From']
-
-    #                 ## Add banner to Subject
-    #                 subject = headers['Subject']
-    #                 if subject.startswith('[FROM NEW SENDER] '):
-    #                     pass
-    #                 else:
-    #                     headers['Subject'] = "[FROM NEW SENDER] " + subject
-
-    #                 m = re.search(r"\<(.*?)\>", sender) # In case sender is something like '"Chan, Tai Man" <ctm@gmail.com>' instead of 'ctm@gmail.com'
-    #                 if m != None:
-    #                     sender = m.group(1)
-
-    #                 logger.info(f"From: {sender}")
-
-    #                 if sender not in domain_list:
-    #                     ## Move the email from Inbox mailbox to New Sender mailbox
-    #                     logger.info(f"Sender address not recognized, now move email from {INBOX_MAILBOX} to {NEW_SENDER_MAILBOX}")
-    #                     shutil.move(filepath, os.path.join(NEW_SENDER_DIR, filename))
-    #                 else:
-    #                     logger.info("Sender address recognized")
-
-    #     logger.info(f"Now sleep for {SLEEP_DURATION} seconds")
-    #     time.sleep(SLEEP_DURATION)
+        logger.info(f"Now sleep for {SLEEP_DURATION} seconds")
+        time.sleep(SLEEP_DURATION)
 
 daemon = Daemonize(app="domain_history", pid=pid, action=main, logger=logger, keep_fds=keep_fds)
 daemon.start()
