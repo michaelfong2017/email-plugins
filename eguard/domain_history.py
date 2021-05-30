@@ -31,7 +31,7 @@ USER_DIRS = [f.path for f in os.scandir(MAIL_DIR) if f.is_dir()]
 SLEEP_DURATION = args.sleep if args.sleep else 1 # second, default is 5
 
 ## Daemonize
-pid = "process.pid"
+pid = ".process.pid"
 logger = logging.getLogger(__name__)
 
 if args.debug:
@@ -63,19 +63,10 @@ def connect_db():
     logger.info(f'Time elapsed for connecting to the database: {datetime.datetime.now() - start_time}')
 
 def init_db():
-    conn.execute('''DROP TABLE known_sender;''')
-
+    start_time = datetime.datetime.now()
     conn.execute('''CREATE TABLE IF NOT EXISTS known_sender (address TEXT PRIMARY KEY NOT NULL);''')
-    
-    address = "\'admin@michaelfong.co\'"
-    try:
-        conn.execute(f'''INSERT INTO known_sender (address) VALUES ({address});''')
-        conn.commit()
-    except Exception as e:
-        logger.error(f'{e} in SETKNOWN operation for address {address}')
-        conn.rollback()
-
-    logger.info(f'Time elapsed for SETKNOWN operation: {datetime.datetime.now() - start_time}')
+    conn.commit()
+    logger.info(f'Time elapsed for initializing the database: {datetime.datetime.now() - start_time}')
 
 def process_userdir(USER_DIR):
     start_time = datetime.datetime.now()
@@ -240,6 +231,13 @@ def main():
         except (NameError, sqlite3.ProgrammingError) as e:
             logger.error(f'{e}')
             connect_db()
+
+        try:
+            conn.execute(f'SELECT count(*) FROM known_sender')
+
+        except (sqlite3.OperationalError) as e:
+            logger.error(f'{e}')
+            init_db()
 
         try:
             process_userdir(USER_DIRS[0])
