@@ -100,7 +100,7 @@ def process_userdir(USER_DIR):
     '''
     INBOX_DIR
     '''
-    INBOX_DIR = os.path.join(USER_DIR, 'cur')
+    INBOX_DIR = os.path.join(USER_DIR, INBOX_DIR_FROM_USER_DIR)
     logger.info(f"Entering inbox directory {INBOX_DIR}")
 
     inbox_mails = [f.name for f in os.scandir(INBOX_DIR)]
@@ -213,7 +213,7 @@ def process_userdir(USER_DIR):
     '''
     JUNK_DIR
     '''
-    JUNK_DIR = os.path.join(USER_DIR, '.Junk', 'cur')
+    JUNK_DIR = os.path.join(USER_DIR, JUNK_DIR_FROM_USER_DIR)
     logger.info(f"Entering junk directory {JUNK_DIR}")
 
     junk_mails = [f.name for f in os.scandir(JUNK_DIR)]
