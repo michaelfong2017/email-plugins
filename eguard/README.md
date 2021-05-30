@@ -5,9 +5,16 @@
 2. Have pip for python3 installed.
 3. Have python3 virtual environment installed.  
 
-For instance, Ubuntu 18.04 ships with python3 and apt. Running only the below command suffices to fulfill the prerequisite.  
+- For instance, Ubuntu 18.04 ships with python3 and apt. Running the below command suffices to install pip for python3 and python3 virtual environment.
+```
+   sudo apt update && sudo apt install python3-pip python3-venv -y
+```
+4. Current user has access right to all user directories.  
 
-```sudo apt update && sudo apt install python3-pip python3-venv -y```
+- Suppose `admin` is the current user and `/mailu/mail/` is the directory that contains all user directories. Running the below command suffices to grant the current user access right to all user directories.
+```
+sudo setfacl -R -m u:admin:rwx /mailu/mail/
+```
 
 ## Installation
 1. Acquire the `eguard` folder from one of the Eguard distributors.
