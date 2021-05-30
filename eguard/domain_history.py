@@ -4,9 +4,8 @@ import time
 import email
 import re
 
-import shutil
-
 import logging
+
 from daemonize import Daemonize
 
 ## sqlite3
@@ -16,22 +15,21 @@ import datetime
 
 ## Handle arguments
 import argparse
+
+## Read config file
+import toml
+
 parser = argparse.ArgumentParser()
 parser.add_argument('-d', '--debug', action='store_true', help='Debug level set from logging.WARNING to logging.DEBUG')
 parser.add_argument('-s', '--sleep', type=int, help='Daemon process sleep duration (in seconds) between loops')
 args = parser.parse_args()
 
 
-THIS_DIR = os.path.dirname(os.path.abspath(__file__))
-ROOT_DIR = os.path.abspath(os.sep)
-MAIL_DIR = os.path.join(ROOT_DIR, 'mailu', 'mail')
-USER_DIRS = [f.path for f in os.scandir(MAIL_DIR) if f.is_dir()]
-
-
 SLEEP_DURATION = args.sleep if args.sleep else 1 # second, default is 5
 
 ## Daemonize
 pid = ".process.pid"
+
 logger = logging.getLogger(__name__)
 
 if args.debug:
@@ -42,12 +40,40 @@ else:
 if not len(logger.handlers) == 0:
     logger.handlers.clear()
 
-logger.propagate = False
 fh = logging.FileHandler("process.log", "w")
 formatter = logging.Formatter('%(asctime)s - %(levelname)s - %(message)s')
 fh.setFormatter(formatter)
 logger.addHandler(fh)
 keep_fds = [fh.stream.fileno()]
+
+ch = logging.StreamHandler()
+ch.setLevel(logging.INFO)
+ch.setFormatter(formatter)
+logger.addHandler(ch)
+
+# Path
+THIS_DIR = os.path.dirname(os.path.abspath(__file__))
+
+# toml
+config = toml.load(os.path.join(THIS_DIR, 'eguard.toml'))
+
+try:
+    if 'UserDirectories' in config['Path']:
+        USER_DIRS = config['Path']['UserDirectories']
+    else:
+        MAIL_DIR = config['Path']['MailDir']
+        USER_DIRS = [f.path for f in os.scandir(MAIL_DIR) if f.is_dir()]
+
+    INBOX_DIR_FROM_USER_DIR = config['Path']['InboxDirFromUserDir']
+    JUNK_DIR_FROM_USER_DIR = config['Path']['JunkDirFromUserDir']
+
+except KeyError as e:
+    logger.error(f'{e}\nPlease check that the above key is properly defined in the configuration file.')
+
+logger.info(f'USER_DIRS: {USER_DIRS}')
+logger.info(f'INBOX_DIR_FROM_USER_DIR: {INBOX_DIR_FROM_USER_DIR}')
+logger.info(f'JUNK_DIR_FROM_USER_DIR: {JUNK_DIR_FROM_USER_DIR}')
+
 
 def connect_db():
     global conn
