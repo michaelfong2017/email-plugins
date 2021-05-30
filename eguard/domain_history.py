@@ -8,16 +8,19 @@ import logging
 
 from daemonize import Daemonize
 
-## sqlite3
+# sqlite3
 import sqlite3
 
 import datetime
 
-## Handle arguments
+# Handle arguments
 import argparse
 
-## Read config file
+# Read config file
 import toml
+
+# Undo queue
+from queue import Queue
 
 parser = argparse.ArgumentParser()
 parser.add_argument('-d', '--debug', action='store_true', help='Debug level set from logging.WARNING to logging.DEBUG')
@@ -27,7 +30,7 @@ args = parser.parse_args()
 
 SLEEP_DURATION = args.sleep if args.sleep else 1 # second, default is 5
 
-## Daemonize
+# Daemonize
 pid = ".process.pid"
 
 logger = logging.getLogger(__name__)
@@ -75,6 +78,10 @@ logger.info(f'INBOX_DIR_FROM_USER_DIR: {INBOX_DIR_FROM_USER_DIR}')
 logger.info(f'JUNK_DIR_FROM_USER_DIR: {JUNK_DIR_FROM_USER_DIR}')
 
 
+# Construct an undo queue in order to unrecognize mistakely recognized sender addresses.
+undo_q = Queue(maxsize = 30)
+
+
 def connect_db():
     global conn
 
@@ -114,6 +121,8 @@ def process_userdir(USER_DIR):
         if ('S' in flags):
             # If message is read, mark as recognized in database.
             with open(filepath, "r+") as f:
+                modified = False
+
                 msg = email.message_from_file(f) # Whole email message including both headers and content
 
                 parser = email.parser.HeaderParser()
@@ -130,6 +139,9 @@ def process_userdir(USER_DIR):
                     f.seek(0)
                     f.write(headers.as_string())
                     f.truncate()
+
+                    # Add to an undo queue in order to unrecognize mistakely recognized sender addresses.
+                    modified = True
                 else:
                     pass
 
@@ -159,54 +171,102 @@ def process_userdir(USER_DIR):
 
             os.rename(filepath, os.path.join(INBOX_DIR, new_filename))
 
+            # Add to an undo queue in order to unrecognize mistakely recognized sender addresses.
+            if modified:
+                undo_q.put(new_filename.split(',')[0])
+
         else:
-            # If message is unread, add a warning banner to the subject.
-            with open(filepath, "r+") as f:
-                msg = email.message_from_file(f) # Whole email message including both headers and content
+            # If message is inside the undo queue, that is, if message is read before but the
+            # user decides to unrecognize the message and therefore marks the message as unread.
+            if inbox_mail.split(',')[0] in undo_q.queue:
+                with open(filepath, "r+") as f:
+                    msg = email.message_from_file(f) # Whole email message including both headers and content
 
-                parser = email.parser.HeaderParser()
-                headers = parser.parsestr(msg.as_string())
+                    parser = email.parser.HeaderParser()
+                    headers = parser.parsestr(msg.as_string())
 
+                    # Find address from the message
+                    sender = headers['From']
 
-                # Find address from the message
-                sender = headers['From']
+                    m = re.search(r"\<(.*?)\>", sender) # In case sender is something like '"Chan, Tai Man" <ctm@gmail.com>' instead of 'ctm@gmail.com'
+                    if m != None:
+                        sender = m.group(1)
 
-                m = re.search(r"\<(.*?)\>", sender) # In case sender is something like '"Chan, Tai Man" <ctm@gmail.com>' instead of 'ctm@gmail.com'
-                if m != None:
-                    sender = m.group(1)
+                    logger.info(f"Sender of this email: {sender}")
 
-                logger.info(f"Sender of this email: {sender}")
-
-                # Add banner to Subject if record does not exist in database
-                try:
-                    cursor = conn.execute(f'SELECT count(*) FROM known_sender WHERE address = \'{sender}\'')
-                    records = cursor.fetchall()
-
-                    match_count = records[0][0]
-                    logger.info(f'match_count is {match_count}')
-
-                    if match_count == 0:
-                        subject = headers['Subject']
-                        if subject.startswith('[FROM NEW SENDER] '):
-                            pass
-                        else:
-                            headers.replace_header('Subject', "[FROM NEW SENDER] " + subject)
-                            f.seek(0)
-                            f.write(headers.as_string())
-                            f.truncate()
-                    else:
+                    # Add banner to Subject
+                    subject = headers['Subject']
+                    if subject.startswith('[FROM NEW SENDER] '):
                         pass
+                    else:
+                        headers.replace_header('Subject', "[FROM NEW SENDER] " + subject)
+                        f.seek(0)
+                        f.write(headers.as_string())
+                        f.truncate()
 
-                except Exception as e:
-                    logger.error(f'{e} in CHECK operation for address {sender}')
+                    # Delete the address from database
+                    try:
+                        conn.execute(f'DELETE FROM known_sender WHERE address = \'{sender}\'')
+                        conn.commit()
+                    except Exception as e:
+                        logger.error(f'{e} in SETUNKNOWN operation for address {sender}')
+                        conn.rollback()
+                
+                # Rename file
+                new_file_size = os.stat(filepath).st_size
 
+                new_filename = re.sub(r',S=[0-9]*,', f',S={new_file_size},', inbox_mail)
 
-            # Rename file
-            new_file_size = os.stat(filepath).st_size
+                os.rename(filepath, os.path.join(INBOX_DIR, new_filename))
 
-            new_filename = re.sub(r',S=[0-9]*,', f',S={new_file_size},', inbox_mail)
-
-            os.rename(filepath, os.path.join(INBOX_DIR, new_filename))
+            else:
+                # If message is unread, add a warning banner to the subject.
+                with open(filepath, "r+") as f:
+                    msg = email.message_from_file(f) # Whole email message including both headers and content
+    
+                    parser = email.parser.HeaderParser()
+                    headers = parser.parsestr(msg.as_string())
+    
+    
+                    # Find address from the message
+                    sender = headers['From']
+    
+                    m = re.search(r"\<(.*?)\>", sender) # In case sender is something like '"Chan, Tai Man" <ctm@gmail.com>' instead of 'ctm@gmail.com'
+                    if m != None:
+                        sender = m.group(1)
+    
+                    logger.info(f"Sender of this email: {sender}")
+    
+                    # Add banner to Subject if record does not exist in database
+                    try:
+                        cursor = conn.execute(f'SELECT count(*) FROM known_sender WHERE address = \'{sender}\'')
+                        records = cursor.fetchall()
+    
+                        match_count = records[0][0]
+                        logger.info(f'match_count is {match_count}')
+    
+                        if match_count == 0:
+                            subject = headers['Subject']
+                            if subject.startswith('[FROM NEW SENDER] '):
+                                pass
+                            else:
+                                headers.replace_header('Subject', "[FROM NEW SENDER] " + subject)
+                                f.seek(0)
+                                f.write(headers.as_string())
+                                f.truncate()
+                        else:
+                            pass
+                        
+                    except Exception as e:
+                        logger.error(f'{e} in CHECK operation for address {sender}')
+    
+    
+                # Rename file
+                new_file_size = os.stat(filepath).st_size
+    
+                new_filename = re.sub(r',S=[0-9]*,', f',S={new_file_size},', inbox_mail)
+    
+                os.rename(filepath, os.path.join(INBOX_DIR, new_filename))
             
 
 
