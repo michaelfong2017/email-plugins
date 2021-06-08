@@ -27,7 +27,7 @@ from queue import Queue
 
 # Handle arguments from command line
 args = parse_args()
-SLEEP_DURATION = args.sleep if args.sleep else 1 # second, default is 5
+SLEEP_DURATION = args.sleep if args.sleep else 1 # second, default is 1
 DEBUG = args.debug
 
 # Logger
@@ -56,6 +56,22 @@ logger.info(f'USER_DIRS: {USER_DIRS}')
 logger.info(f'INBOX_DIR_FROM_USER_DIR: {INBOX_DIR_FROM_USER_DIR}')
 logger.info(f'JUNK_DIR_FROM_USER_DIR: {JUNK_DIR_FROM_USER_DIR}')
 
+
+# Construct a check set that stores a set of checked mails in a mailbox
+# so that mails are not redundantly checked.
+
+# A set that contains all mails in a mailbox should also be constructed 
+# to remove mails from the check set when these mails do not exist, 
+# so that when the same mail name is reused, the mail can be checked again.
+userdir_to_maildir_to_setname_to_set = {}
+for userdir in USER_DIRS:
+    userdir_to_maildir_to_setname_to_set[userdir] = {}
+    for maildir in [INBOX_DIR_FROM_USER_DIR, JUNK_DIR_FROM_USER_DIR]:
+        userdir_to_maildir_to_setname_to_set[userdir][maildir] = {}
+        for setname in ['checked', 'all']:
+            userdir_to_maildir_to_setname_to_set[userdir][maildir][setname] = set()
+
+logger.info(f'userdir_to_maildir_to_setname_to_set: {userdir_to_maildir_to_setname_to_set}')
 
 # Construct an undo queue in order to unrecognize mistakely recognized sender addresses.
 undo_q = Queue(maxsize = 30)
@@ -90,9 +106,17 @@ def process_userdir(USER_DIR):
     INBOX_DIR = os.path.join(USER_DIR, INBOX_DIR_FROM_USER_DIR)
     logger.info(f"Entering inbox directory {INBOX_DIR}")
 
-    inbox_mails = [f.name for f in os.scandir(INBOX_DIR)]
+    inbox_all = set([f.name for f in os.scandir(INBOX_DIR)])
 
-    for inbox_mail in inbox_mails:
+    # Avoid redundant check
+    userdir_to_maildir_to_setname_to_set[USER_DIR][INBOX_DIR_FROM_USER_DIR]['all'] = inbox_all
+    inbox_checked = userdir_to_maildir_to_setname_to_set[USER_DIR][INBOX_DIR_FROM_USER_DIR]['checked'] 
+    userdir_to_maildir_to_setname_to_set[USER_DIR][INBOX_DIR_FROM_USER_DIR]['checked'] = inbox_all.intersection(inbox_checked)
+    inbox_unchecked = inbox_all.difference(inbox_checked)
+
+    logger.info(f'userdir_to_maildir_to_setname_to_set length: {len(userdir_to_maildir_to_setname_to_set[USER_DIR][INBOX_DIR_FROM_USER_DIR]["checked"])}')
+
+    for inbox_mail in inbox_unchecked:
         logger.info(f"Checking email {inbox_mail}")
 
         filepath = os.path.join(INBOX_DIR, inbox_mail)
@@ -114,6 +138,7 @@ def process_userdir(USER_DIR):
                 body_plain, body_html = find_body_plain_and_html_from_message(msg)
                 
                 logger.info('yoyoyoyo')
+                logger.info(headers)
                 logger.info(body_plain)
                 logger.info(body_html)
 
@@ -147,7 +172,7 @@ def process_userdir(USER_DIR):
                     headers = parser.parsestr(msg.as_string())
 
                     # Add banner to Subject
-                    add_banner_to_subject(msg, f, headers)
+                    add_banner_to_subject(msg, f, headers=headers)
 
                 # Find address from the message
                 address = find_address_from_message(msg, headers=headers)
@@ -173,31 +198,16 @@ def process_userdir(USER_DIR):
                     address = find_address_from_message(msg, headers=headers)
     
                     # Add banner to Subject if record does not exist in database
-                    if is_address_exists_in_known_sender() == True:
-                        subject = headers['Subject']
-                        if subject.startswith('[FROM NEW SENDER] '):
-                            pass
-                        else:
-                            headers.replace_header('Subject', "[FROM NEW SENDER] " + subject)
-                            
-                            logger.error(headers)
-                            logger.error(headers.as_string())
-                            logger.error(headers.__str__())
-                            
-                            f.seek(0)
-                            f.write(headers.as_string())
-                            f.truncate()
+                    if not is_address_exists_in_known_sender(address, conn, logger=logger) == True:
+                        add_banner_to_subject(msg, f, headers=headers)
                     else:
                         pass
     
     
-                # Rename file
-                new_file_size = os.stat(filepath).st_size
-    
-                new_filename = re.sub(r',S=[0-9]*,', f',S={new_file_size},', inbox_mail)
-    
-                os.rename(filepath, os.path.join(INBOX_DIR, new_filename))
+                # Rename file based on size
+                rename_file_based_on_size(INBOX_DIR, inbox_mail)
             
+        userdir_to_maildir_to_setname_to_set[USER_DIR][INBOX_DIR_FROM_USER_DIR]['checked'].add(inbox_mail)
 
 
     '''

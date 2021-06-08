@@ -36,25 +36,28 @@ def remove_banner_from_subject(msg, file, headers=None):
         headers.replace_header('Subject', subject.replace('[FROM NEW SENDER] ',''))
         file.seek(0)
         file.write(headers.as_string())
-        file.truncate
+        file.truncate()
+
+        return True
     else:
         pass
     
-    return True
+    return False
 
 # Add banner to Subject
 def add_banner_to_subject(msg, file, headers=None):
     if headers is None:
         parser = email.parser.HeaderParser()
         headers = parser.parsestr(msg.as_string())
-        subject = headers['Subject']
-        if subject.startswith('[FROM NEW SENDER] '):
-            pass
-        else:
-            headers.replace_header('Subject', "[FROM NEW SENDER] " + subject)
-            file.seek(0)
-            file.write(headers.as_string())
-            file.truncate()
+
+    subject = headers['Subject']
+    if subject.startswith('[FROM NEW SENDER] '):
+        pass
+    else:
+        headers.replace_header('Subject', "[FROM NEW SENDER] " + subject)
+        file.seek(0)
+        file.write(headers.as_string())
+        file.truncate()
 
 # Find address from the message
 def find_address_from_message(msg, headers=None):

@@ -12,7 +12,7 @@ def insert_address_to_known_sender(address, conn, logger=None):
 # Delete the address from known sender
 def delete_address_from_known_sender(address, conn, logger=None):
     try:
-        conn.execute(f'DELETE FROM known_sender WHERE address = \'{address}\'')
+        conn.execute(f'''DELETE FROM known_sender WHERE address = {address};''')
         conn.commit()
     except Exception as e:
         if logger is not None:
@@ -23,7 +23,7 @@ def delete_address_from_known_sender(address, conn, logger=None):
 # Find if address exists in known sender
 def is_address_exists_in_known_sender(address, conn, logger=None):
     try:
-        cursor = conn.execute(f'SELECT count(*) FROM known_sender WHERE address = \'{address}\'')
+        cursor = conn.execute(f'''SELECT count(*) FROM known_sender WHERE address = {address};''')
         records = cursor.fetchall()
         match_count = records[0][0]
 
