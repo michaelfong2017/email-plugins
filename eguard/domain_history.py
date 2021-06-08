@@ -1,10 +1,15 @@
+# My own utils
+from util.message_util import *
+from util.database_util import *
+from util.logger import *
+# Handle arguments
+from util.arg_parser import *
+
 import os
 import time
 
 import email
 import re
-
-import logging
 
 from daemonize import Daemonize
 
@@ -13,8 +18,6 @@ import sqlite3
 
 import datetime
 
-# Handle arguments
-import argparse
 
 # Read config file
 import toml
@@ -22,37 +25,13 @@ import toml
 # Undo queue
 from queue import Queue
 
-parser = argparse.ArgumentParser()
-parser.add_argument('-d', '--debug', action='store_true', help='Debug level set from logging.WARNING to logging.DEBUG')
-parser.add_argument('-s', '--sleep', type=int, help='Daemon process sleep duration (in seconds) between loops')
-args = parser.parse_args()
-
-
+# Handle arguments from command line
+args = parse_args()
 SLEEP_DURATION = args.sleep if args.sleep else 1 # second, default is 5
+DEBUG = args.debug
 
-# Daemonize
-pid = ".process.pid"
-
-logger = logging.getLogger(__name__)
-
-if args.debug:
-    logger.setLevel(logging.DEBUG)
-else:
-    logger.setLevel(logging.CRITICAL)
-
-if not len(logger.handlers) == 0:
-    logger.handlers.clear()
-
-fh = logging.FileHandler("process.log", "w")
-formatter = logging.Formatter('%(asctime)s - %(levelname)s - %(message)s')
-fh.setFormatter(formatter)
-logger.addHandler(fh)
-keep_fds = [fh.stream.fileno()]
-
-ch = logging.StreamHandler()
-ch.setLevel(logging.INFO)
-ch.setFormatter(formatter)
-logger.addHandler(ch)
+# Logger
+logger, keep_fds = create_logger(debug=DEBUG)
 
 # Path
 THIS_DIR = os.path.dirname(os.path.abspath(__file__))
@@ -97,6 +76,7 @@ def connect_db():
 
 def init_db():
     start_time = datetime.datetime.now()
+    # conn.execute('''CREATE TABLE IF NOT EXISTS user_pc (id INT PRIMARY KEY NOT NULL, known_address TEXT NOT NULL, junk_address TEXT NOT NULL);''')
     conn.execute('''CREATE TABLE IF NOT EXISTS known_sender (address TEXT PRIMARY KEY NOT NULL);''')
     conn.commit()
     logger.info(f'Time elapsed for initializing the database: {datetime.datetime.now() - start_time}')
@@ -118,58 +98,37 @@ def process_userdir(USER_DIR):
         filepath = os.path.join(INBOX_DIR, inbox_mail)
 
         flags = inbox_mail.split(',')[-1]
+
+        # If message is read, mark as recognized in database.
         if ('S' in flags):
-            # If message is read, mark as recognized in database.
+            msg = ""
+            headers = ""
             with open(filepath, "r+") as f:
                 modified = False
 
+                # Get msg and headers from file for further processing
                 msg = email.message_from_file(f) # Whole email message including both headers and content
-
                 parser = email.parser.HeaderParser()
                 headers = parser.parsestr(msg.as_string())
 
-                # for h in headers.items(): # Get all header information, this can be commented since we now just need to identify the sender
-                #     print(h)
+                body_plain, body_html = find_body_plain_and_html_from_message(msg)
+                
+                logger.info('yoyoyoyo')
+                logger.info(body_plain)
+                logger.info(body_html)
+
+                # modified: Add to an undo queue in order to unrecognize mistakely recognized sender addresses.
+                modified = remove_banner_from_subject(msg, f, headers=headers)
 
 
-                # Remove banner from Subject if exists
-                subject = headers['Subject']
-                if subject.startswith('[FROM NEW SENDER] '):
-                    headers.replace_header('Subject', subject.replace('[FROM NEW SENDER] ',''))
-                    f.seek(0)
-                    f.write(headers.as_string())
-                    f.truncate()
+            # Find address from the message
+            address = find_address_from_message(msg, headers=headers)
 
-                    # Add to an undo queue in order to unrecognize mistakely recognized sender addresses.
-                    modified = True
-                else:
-                    pass
+            # Insert the address to known sender
+            insert_address_to_known_sender(address, conn, logger=logger)
 
-                # Find address from the message
-                sender = headers['From']
-
-                m = re.search(r"\<(.*?)\>", sender) # In case sender is something like '"Chan, Tai Man" <ctm@gmail.com>' instead of 'ctm@gmail.com'
-                if m != None:
-                    sender = m.group(1)
-
-                logger.info(f"Sender of this email: {sender}")
-
-                address = f"\'{sender}\'"
-
-                # Insert the address to database
-                try:
-                    conn.execute(f'''INSERT INTO known_sender (address) VALUES ({address});''')
-                    conn.commit()
-                except Exception as e:
-                    logger.error(f'{e} in SETKNOWN operation for address {address}')
-                    conn.rollback()
-
-            # Rename file
-            new_file_size = os.stat(filepath).st_size
-
-            new_filename = re.sub(r',S=[0-9]*,', f',S={new_file_size},', inbox_mail)
-
-            os.rename(filepath, os.path.join(INBOX_DIR, new_filename))
+            # Rename file based on size
+            new_filename = rename_file_based_on_size(INBOX_DIR, inbox_mail)
 
             # Add to an undo queue in order to unrecognize mistakely recognized sender addresses.
             if modified:
@@ -179,86 +138,57 @@ def process_userdir(USER_DIR):
             # If message is inside the undo queue, that is, if message is read before but the
             # user decides to unrecognize the message and therefore marks the message as unread.
             if inbox_mail.split(',')[0] in undo_q.queue:
+                msg = ""
+                headers = ""
                 with open(filepath, "r+") as f:
+                    # Get msg and headers from file for further processing
                     msg = email.message_from_file(f) # Whole email message including both headers and content
-
                     parser = email.parser.HeaderParser()
                     headers = parser.parsestr(msg.as_string())
 
-                    # Find address from the message
-                    sender = headers['From']
-
-                    m = re.search(r"\<(.*?)\>", sender) # In case sender is something like '"Chan, Tai Man" <ctm@gmail.com>' instead of 'ctm@gmail.com'
-                    if m != None:
-                        sender = m.group(1)
-
-                    logger.info(f"Sender of this email: {sender}")
-
                     # Add banner to Subject
-                    subject = headers['Subject']
-                    if subject.startswith('[FROM NEW SENDER] '):
-                        pass
-                    else:
-                        headers.replace_header('Subject', "[FROM NEW SENDER] " + subject)
-                        f.seek(0)
-                        f.write(headers.as_string())
-                        f.truncate()
+                    add_banner_to_subject(msg, f, headers)
 
-                    # Delete the address from database
-                    try:
-                        conn.execute(f'DELETE FROM known_sender WHERE address = \'{sender}\'')
-                        conn.commit()
-                    except Exception as e:
-                        logger.error(f'{e} in SETUNKNOWN operation for address {sender}')
-                        conn.rollback()
+                # Find address from the message
+                address = find_address_from_message(msg, headers=headers)
+
+                # Delete the address from known sender
+                delete_address_from_known_sender(address, conn, logger=logger)
                 
-                # Rename file
-                new_file_size = os.stat(filepath).st_size
+                # Rename file based on size
+                rename_file_based_on_size(INBOX_DIR, inbox_mail)
 
-                new_filename = re.sub(r',S=[0-9]*,', f',S={new_file_size},', inbox_mail)
-
-                os.rename(filepath, os.path.join(INBOX_DIR, new_filename))
 
             else:
                 # If message is unread, add a warning banner to the subject.
+                msg = ""
+                headers = ""
                 with open(filepath, "r+") as f:
+                    # Get msg and headers from file for further processing
                     msg = email.message_from_file(f) # Whole email message including both headers and content
-    
                     parser = email.parser.HeaderParser()
                     headers = parser.parsestr(msg.as_string())
     
-    
                     # Find address from the message
-                    sender = headers['From']
-    
-                    m = re.search(r"\<(.*?)\>", sender) # In case sender is something like '"Chan, Tai Man" <ctm@gmail.com>' instead of 'ctm@gmail.com'
-                    if m != None:
-                        sender = m.group(1)
-    
-                    logger.info(f"Sender of this email: {sender}")
+                    address = find_address_from_message(msg, headers=headers)
     
                     # Add banner to Subject if record does not exist in database
-                    try:
-                        cursor = conn.execute(f'SELECT count(*) FROM known_sender WHERE address = \'{sender}\'')
-                        records = cursor.fetchall()
-    
-                        match_count = records[0][0]
-                        logger.info(f'match_count is {match_count}')
-    
-                        if match_count == 0:
-                            subject = headers['Subject']
-                            if subject.startswith('[FROM NEW SENDER] '):
-                                pass
-                            else:
-                                headers.replace_header('Subject', "[FROM NEW SENDER] " + subject)
-                                f.seek(0)
-                                f.write(headers.as_string())
-                                f.truncate()
-                        else:
+                    if is_address_exists_in_known_sender() == True:
+                        subject = headers['Subject']
+                        if subject.startswith('[FROM NEW SENDER] '):
                             pass
-                        
-                    except Exception as e:
-                        logger.error(f'{e} in CHECK operation for address {sender}')
+                        else:
+                            headers.replace_header('Subject', "[FROM NEW SENDER] " + subject)
+                            
+                            logger.error(headers)
+                            logger.error(headers.as_string())
+                            logger.error(headers.__str__())
+                            
+                            f.seek(0)
+                            f.write(headers.as_string())
+                            f.truncate()
+                    else:
+                        pass
     
     
                 # Rename file
@@ -335,6 +265,10 @@ def main():
 
         logger.info(f"Now sleep for {SLEEP_DURATION} seconds")
         time.sleep(SLEEP_DURATION)
+
+
+# Daemonize
+pid = ".process.pid"
 
 daemon = Daemonize(app="domain_history", pid=pid, action=main, logger=logger, keep_fds=keep_fds)
 daemon.start()
