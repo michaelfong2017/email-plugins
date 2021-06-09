@@ -110,11 +110,11 @@ def process_userdir(USER_DIR):
 
     # Avoid redundant check
     userdir_to_maildir_to_setname_to_set[USER_DIR][INBOX_DIR_FROM_USER_DIR]['all'] = inbox_all
+    userdir_to_maildir_to_setname_to_set[USER_DIR][INBOX_DIR_FROM_USER_DIR]['checked'] = inbox_all.intersection(userdir_to_maildir_to_setname_to_set[USER_DIR][INBOX_DIR_FROM_USER_DIR]['checked'])
     inbox_checked = userdir_to_maildir_to_setname_to_set[USER_DIR][INBOX_DIR_FROM_USER_DIR]['checked'] 
-    userdir_to_maildir_to_setname_to_set[USER_DIR][INBOX_DIR_FROM_USER_DIR]['checked'] = inbox_all.intersection(inbox_checked)
     inbox_unchecked = inbox_all.difference(inbox_checked)
 
-    logger.info(f'userdir_to_maildir_to_setname_to_set length: {len(userdir_to_maildir_to_setname_to_set[USER_DIR][INBOX_DIR_FROM_USER_DIR]["checked"])}')
+    logger.info(f'inbox_checked length: {len(inbox_checked)}')
 
     for inbox_mail in inbox_unchecked:
         logger.info(f"Checking email {inbox_mail}")
@@ -216,35 +216,36 @@ def process_userdir(USER_DIR):
     JUNK_DIR = os.path.join(USER_DIR, JUNK_DIR_FROM_USER_DIR)
     logger.info(f"Entering junk directory {JUNK_DIR}")
 
-    junk_mails = [f.name for f in os.scandir(JUNK_DIR)]
+    junk_all = set([f.name for f in os.scandir(JUNK_DIR)])
 
-    for junk_mail in junk_mails:
+    # Avoid redundant check
+    userdir_to_maildir_to_setname_to_set[USER_DIR][JUNK_DIR_FROM_USER_DIR]['all'] = junk_all
+    userdir_to_maildir_to_setname_to_set[USER_DIR][JUNK_DIR_FROM_USER_DIR]['checked'] = junk_all.intersection(userdir_to_maildir_to_setname_to_set[USER_DIR][JUNK_DIR_FROM_USER_DIR]['checked'])
+    junk_checked = userdir_to_maildir_to_setname_to_set[USER_DIR][JUNK_DIR_FROM_USER_DIR]['checked'] 
+    junk_unchecked = junk_all.difference(junk_checked)
+
+    logger.info(f'junk_unchecked length: {len(junk_unchecked)}')
+
+    for junk_mail in junk_unchecked:
         logger.info(f"Checking email {junk_mail}")
 
         filepath = os.path.join(JUNK_DIR, junk_mail)
 
         with open(filepath, "r") as f:
+            # Get msg and headers from file for further processing
             msg = email.message_from_file(f) # Whole email message including both headers and content
-
             parser = email.parser.HeaderParser()
             headers = parser.parsestr(msg.as_string())
 
             # Find address from the message
-            sender = headers['From']
+            address = find_address_from_message(msg, headers=headers)
 
-            m = re.search(r"\<(.*?)\>", sender) # In case sender is something like '"Chan, Tai Man" <ctm@gmail.com>' instead of 'ctm@gmail.com'
-            if m != None:
-                sender = m.group(1)
+            # Delete the address from known sender
+            delete_address_from_known_sender(address, conn, logger=logger)
 
-            logger.info(f"Sender of this email: {sender}")
 
-            # Delete the address from database
-            try:
-                conn.execute(f'DELETE FROM known_sender WHERE address = \'{sender}\'')
-                conn.commit()
-            except Exception as e:
-                logger.error(f'{e} in SETUNKNOWN operation for address {sender}')
-                conn.rollback()
+        userdir_to_maildir_to_setname_to_set[USER_DIR][JUNK_DIR_FROM_USER_DIR]['checked'].add(junk_mail)
+
 
     logger.info(f'Time elapsed for processing {USER_DIR}: {datetime.datetime.now() - start_time}')
 
