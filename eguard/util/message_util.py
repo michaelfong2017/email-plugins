@@ -10,13 +10,25 @@ import re
 
 import os
 
-BANNER_PLAIN = '''Caution: The domain of email sender is first seen.  Beware of any
+UNKNOWN_SUBJECT = '''[FROM NEW SENDER] '''
+
+JUNK_SUBJECT = '''[JUNK MAIL] '''
+
+UNKNOWN_BANNER_PLAIN = '''Caution: The domain of email sender is first seen.  Beware of any
 hyperlink, attachment and bank account information unless you ensure the
 authenticity of the sender.  Seek IT assistance if in doubt.  
 注意：這是首次接收到的電郵地址。除非您確保其真確性，否則請留意當中所附有的超連結，附件或銀行帳戶資料。如有疑問，請尋求技術人員的支援。
 
 '''
-BANNER_HTML = '''<p style="margin: 10px 20%; text-align: center; border: 2px solid; background-color: #ff4444; padding: 5px;">Caution: The domain of email sender is first seen. &nbsp;Beware of any hyperlink, attachment and bank account information unless you ensure the authenticity of the sender. &nbsp;Seek IT assistance if in doubt.&nbsp;&nbsp;<br /><span>注意：這是首次接收到的電郵地址。除非您確保其真確性，否則請留意當中所附有的超連結，附件或銀行帳戶資料。如有疑問，請尋求技術人員的支援。</span></p>\n'''
+UNKNOWN_BANNER_HTML = '''<p style="margin: 10px 20%; text-align: center; border: 2px solid; background-color: #ff7400; padding: 5px;">Caution: The domain of email sender is first seen. &nbsp;Beware of any hyperlink, attachment and bank account information unless you ensure the authenticity of the sender. &nbsp;Seek IT assistance if in doubt.&nbsp;&nbsp;<br /><span>注意：這是首次接收到的電郵地址。除非您確保其真確性，否則請留意當中所附有的超連結，附件或銀行帳戶資料。如有疑問，請尋求技術人員的支援。</span></p>\n'''
+
+JUNK_BANNER_PLAIN = '''Warning: The domain of email sender was reported as a junk sender.  Beware of any
+hyperlink, attachment and bank account information unless you ensure the
+authenticity of the sender.  Seek IT assistance if in doubt.  
+警告：這是曾被舉報為垃圾發件人的電郵地址。除非您確保其真確性，否則請留意當中所附有的超連結，附件或銀行帳戶資料。如有疑問，請尋求技術人員的支援。
+
+'''
+JUNK_BANNER_HTML = '''<p style="margin: 10px 20%; text-align: center; border: 2px solid; background-color: #ff4444; padding: 5px;">Warning: The domain of email sender was reported as a junk sender. &nbsp;Beware of any hyperlink, attachment and bank account information unless you ensure the authenticity of the sender. &nbsp;Seek IT assistance if in doubt.&nbsp;&nbsp;<br /><span>注意：這是曾被舉報為垃圾發件人的電郵地址。除非您確保其真確性，否則請留意當中所附有的超連結，附件或銀行帳戶資料。如有疑問，請尋求技術人員的支援。</span></p>\n'''
 
 
 def find_body_plain_and_html_from_message(msg):
@@ -44,7 +56,12 @@ def find_body_plain_and_html_from_message(msg):
 
 
 # Remove banner from Subject if exists
-def remove_banner_from_subject(filepath):
+def remove_banner_from_subject(filepath, is_junk=False):
+    if is_junk:
+        SUBJECT = JUNK_SUBJECT
+    else:
+        SUBJECT = UNKNOWN_SUBJECT
+
     with open(filepath, "r+") as f:
         # Get msg and headers from file for further processing
         msg = email.message_from_file(f) # Whole email message including both headers and content
@@ -52,8 +69,8 @@ def remove_banner_from_subject(filepath):
         headers = parser.parsestr(msg.as_string())
 
         subject = headers['Subject']
-        if subject.startswith('[FROM NEW SENDER] '):
-            headers.replace_header('Subject', subject.replace('[FROM NEW SENDER] ',''))
+        if subject.startswith(SUBJECT):
+            headers.replace_header('Subject', subject.replace(SUBJECT,''))
             f.seek(0)
             f.write(headers.as_string())
             f.truncate()
@@ -62,7 +79,12 @@ def remove_banner_from_subject(filepath):
     
 
 # Add banner to Subject
-def add_banner_to_subject(filepath):
+def add_banner_to_subject(filepath, is_junk=False):
+    if is_junk:
+        SUBJECT = JUNK_SUBJECT
+    else:
+        SUBJECT = UNKNOWN_SUBJECT
+
     with open(filepath, "r+") as f:
         # Get msg and headers from file for further processing
         msg = email.message_from_file(f) # Whole email message including both headers and content
@@ -70,10 +92,10 @@ def add_banner_to_subject(filepath):
         headers = parser.parsestr(msg.as_string())
 
         subject = headers['Subject']
-        if subject.startswith('[FROM NEW SENDER] '):
+        if subject.startswith(SUBJECT):
             pass
         else:
-            headers.replace_header('Subject', "[FROM NEW SENDER] " + subject)
+            headers.replace_header('Subject', SUBJECT + subject)
             f.seek(0)
             f.write(headers.as_string())
             f.truncate()
@@ -87,9 +109,10 @@ def find_address_from_message(filepath):
         headers = parser.parsestr(msg.as_string())
 
         sender = headers['From']
-        m = re.search(r"\<(.*?)\>", sender) # In case sender is something like '"Chan, Tai Man" <ctm@gmail.com>' instead of 'ctm@gmail.com'
-        if m != None:
-            sender = m.group(1)
+        if sender != None:
+            m = re.search(r"\<(.*?)\>", sender) # In case sender is something like '"Chan, Tai Man" <ctm@gmail.com>' instead of 'ctm@gmail.com'
+            if m != None:
+                sender = m.group(1)
         address = f"\'{sender}\'"
         return address
 
@@ -107,53 +130,15 @@ def rename_file_based_on_size(INBOX_DIR, inbox_mail):
     return new_filename
     
 
-# Prepend warning banner to mail body (have to handle for both plain and html)
-def prepend_banner_to_body(filepath):
-    with open(filepath, "r+") as f:
-        # Use policy=policy.default so that this returns an EmailMessage object instead of Message object.
-        msg = email.message_from_file(f, policy=policy.default) # Whole email message including both headers and content
-
-        new_msg = MIMEMultipart('alternative')
-        # Exclude "Content-Type" and "MIME-Version" because MIMEMultipart('alternative') already contains them.
-        # Exclude "Content-Transfer-Encoding" because 'alternative' does not have this but plain text email has this.
-        headers = list((k, v) for (k, v) in msg.items() if k not in ("Content-Type", "MIME-Version", "Content-Transfer-Encoding"))
-
-        for k, v in headers:
-            new_msg[k] = v
-
-        for k, v in headers:
-            del msg[k]
-
-        # Create the body of the message from the original msg (a plain-text and an HTML version).
-        body_plain, body_html, is_multipart = find_body_plain_and_html_from_message(msg)
-
-        banner_plain = BANNER_PLAIN
-
-        if is_multipart:
-            body_plain = body_plain.decode("utf-8")
-            body_html = body_html.decode("utf-8")
-            html = f'''<html><head><meta http-equiv="Content-Type" content="text/html; charset=UTF-8" /></head><body style=\'font-size: 10pt; font-family: Verdana,Geneva,sans-serif\'>\n{BANNER_HTML}{body_html}</body></html>\n'''
-        else:
-            html = f'''<html><head><meta http-equiv="Content-Type" content="text/html; charset=UTF-8" /></head><body style=\'font-size: 10pt; font-family: Verdana,Geneva,sans-serif\'>\n{BANNER_HTML}<p>{body_plain}</p>\n</body></html>\n'''
-
-        # Record the MIME types of both parts - text/plain and text/html.
-        part1 = MIMEText(banner_plain + body_plain, 'plain')
-        part2 = MIMEText(html, 'html')
-
-        # Attach parts into message container.
-        # According to RFC 2046, the last part of a multipart message, in this case
-        # the HTML message, is best and preferred.
-        new_msg.attach(part1)
-        new_msg.attach(part2)
-
-        
-        f.seek(0)
-        f.write(new_msg.as_string())
-        f.truncate()
-
-
 # Remove the previously prepended warning banner from mail body (have to handle for both plain and html)
-def remove_banner_from_body(filepath):
+def remove_banner_from_body(filepath, is_junk=False):
+    if is_junk:
+        BANNER_PLAIN = JUNK_BANNER_PLAIN
+        BANNER_HTML = JUNK_BANNER_HTML
+    else:
+        BANNER_PLAIN = UNKNOWN_BANNER_PLAIN
+        BANNER_HTML = UNKNOWN_BANNER_HTML
+
     with open(filepath, "r+") as f:
         # Use policy=policy.default so that this returns an EmailMessage object instead of Message object.
         msg = email.message_from_file(f, policy=policy.default) # Whole email message including both headers and content
@@ -184,6 +169,64 @@ def remove_banner_from_body(filepath):
         # Record the MIME types of both parts - text/plain and text/html.
         part1 = MIMEText(new_body_plain, 'plain')
         part2 = MIMEText(new_body_html, 'html')
+
+        # Attach parts into message container.
+        # According to RFC 2046, the last part of a multipart message, in this case
+        # the HTML message, is best and preferred.
+        new_msg.attach(part1)
+        new_msg.attach(part2)
+
+        
+        f.seek(0)
+        f.write(new_msg.as_string())
+        f.truncate()
+
+
+# Prepend warning banner to mail body (have to handle for both plain and html)
+def add_banner_to_body(filepath, is_junk=False):
+    if is_junk:
+        BANNER_PLAIN = JUNK_BANNER_PLAIN
+        BANNER_HTML = JUNK_BANNER_HTML
+    else:
+        BANNER_PLAIN = UNKNOWN_BANNER_PLAIN
+        BANNER_HTML = UNKNOWN_BANNER_HTML
+
+    with open(filepath, "r+") as f:
+        # Use policy=policy.default so that this returns an EmailMessage object instead of Message object.
+        msg = email.message_from_file(f, policy=policy.default) # Whole email message including both headers and content
+
+        new_msg = MIMEMultipart('alternative')
+        # Exclude "Content-Type" and "MIME-Version" because MIMEMultipart('alternative') already contains them.
+        # Exclude "Content-Transfer-Encoding" because 'alternative' does not have this but plain text email has this.
+        headers = list((k, v) for (k, v) in msg.items() if k not in ("Content-Type", "MIME-Version", "Content-Transfer-Encoding"))
+
+        for k, v in headers:
+            new_msg[k] = v
+
+        for k, v in headers:
+            del msg[k]
+
+        # Create the body of the message from the original msg (a plain-text and an HTML version).
+        body_plain, body_html, is_multipart = find_body_plain_and_html_from_message(msg)
+
+        banner_plain = BANNER_PLAIN
+
+        # If not multipart, for example, plain text only.
+        if is_multipart:
+            body_plain = body_plain.decode("utf-8")
+            body_html = body_html.decode("utf-8")
+
+            # The 2 lines below remove existing banner(s) first.
+            body_plain = re.sub(BANNER_PLAIN, '', body_plain)
+            body_html = re.sub(BANNER_HTML, '', body_html)
+
+            html = f'''<html><head><meta http-equiv="Content-Type" content="text/html; charset=UTF-8" /></head><body style=\'font-size: 10pt; font-family: Verdana,Geneva,sans-serif\'>\n{BANNER_HTML}{body_html}</body></html>\n'''
+        else:
+            html = f'''<html><head><meta http-equiv="Content-Type" content="text/html; charset=UTF-8" /></head><body style=\'font-size: 10pt; font-family: Verdana,Geneva,sans-serif\'>\n{BANNER_HTML}<p>{body_plain}</p>\n</body></html>\n'''
+
+        # Record the MIME types of both parts - text/plain and text/html.
+        part1 = MIMEText(banner_plain + body_plain, 'plain')
+        part2 = MIMEText(html, 'html')
 
         # Attach parts into message container.
         # According to RFC 2046, the last part of a multipart message, in this case
