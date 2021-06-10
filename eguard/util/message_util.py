@@ -37,12 +37,9 @@ def remove_banner_from_subject(msg, file, headers=None):
         file.seek(0)
         file.write(headers.as_string())
         file.truncate()
-
-        return True
     else:
         pass
     
-    return False
 
 # Add banner to Subject
 def add_banner_to_subject(msg, file, headers=None):
@@ -83,4 +80,3 @@ def rename_file_based_on_size(INBOX_DIR, inbox_mail):
 
     os.rename(filepath, os.path.join(INBOX_DIR, new_filename))
     
-    return new_filename

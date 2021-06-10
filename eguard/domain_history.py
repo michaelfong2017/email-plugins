@@ -73,9 +73,6 @@ for userdir in USER_DIRS:
 
 logger.info(f'userdir_to_maildir_to_setname_to_set: {userdir_to_maildir_to_setname_to_set}')
 
-# Construct an undo queue in order to unrecognize mistakely recognized sender addresses.
-undo_q = Queue(maxsize = 30)
-
 
 def connect_db():
     global conn
@@ -90,12 +87,6 @@ def connect_db():
     connect_db_time = datetime.datetime.now()
     logger.info(f'Time elapsed for connecting to the database: {datetime.datetime.now() - start_time}')
 
-def init_db():
-    start_time = datetime.datetime.now()
-    # conn.execute('''CREATE TABLE IF NOT EXISTS user_pc (id INT PRIMARY KEY NOT NULL, known_address TEXT NOT NULL, junk_address TEXT NOT NULL);''')
-    conn.execute('''CREATE TABLE IF NOT EXISTS known_sender (address TEXT PRIMARY KEY NOT NULL);''')
-    conn.commit()
-    logger.info(f'Time elapsed for initializing the database: {datetime.datetime.now() - start_time}')
 
 def process_userdir(USER_DIR):
     start_time = datetime.datetime.now()
@@ -108,13 +99,21 @@ def process_userdir(USER_DIR):
 
     inbox_all = set([f.name for f in os.scandir(INBOX_DIR)])
 
-    # Avoid redundant check
+    '''Avoid redundant check'''
     userdir_to_maildir_to_setname_to_set[USER_DIR][INBOX_DIR_FROM_USER_DIR]['all'] = inbox_all
-    userdir_to_maildir_to_setname_to_set[USER_DIR][INBOX_DIR_FROM_USER_DIR]['checked'] = inbox_all.intersection(userdir_to_maildir_to_setname_to_set[USER_DIR][INBOX_DIR_FROM_USER_DIR]['checked'])
+
+    # The set of mails that are previously checked.
     inbox_checked = userdir_to_maildir_to_setname_to_set[USER_DIR][INBOX_DIR_FROM_USER_DIR]['checked'] 
+
+    # The set of mails that are previously checked but do not exist in the current mail directory.
+    # This means that these mails have been altered, usually the flags are altered.
+    inbox_previous = inbox_checked.difference(inbox_all)
+
+    # The set of mails that are not checked previously and are about to be checked.
     inbox_unchecked = inbox_all.difference(inbox_checked)
 
-    logger.info(f'inbox_checked length: {len(inbox_checked)}')
+    logger.info(f'inbox_previous: {inbox_previous}')
+    logger.info(f'inbox_unchecked length: {len(inbox_unchecked)}')
 
     for inbox_mail in inbox_unchecked:
         logger.info(f"Checking email {inbox_mail}")
@@ -128,8 +127,6 @@ def process_userdir(USER_DIR):
             msg = ""
             headers = ""
             with open(filepath, "r+") as f:
-                modified = False
-
                 # Get msg and headers from file for further processing
                 msg = email.message_from_file(f) # Whole email message including both headers and content
                 parser = email.parser.HeaderParser()
@@ -142,8 +139,8 @@ def process_userdir(USER_DIR):
                 logger.info(body_plain)
                 logger.info(body_html)
 
-                # modified: Add to an undo queue in order to unrecognize mistakely recognized sender addresses.
-                modified = remove_banner_from_subject(msg, f, headers=headers)
+                # Remove banner from Subject if exists
+                remove_banner_from_subject(msg, f, headers=headers)
 
 
             # Find address from the message
@@ -153,16 +150,23 @@ def process_userdir(USER_DIR):
             insert_address_to_known_sender(address, conn, logger=logger)
 
             # Rename file based on size
-            new_filename = rename_file_based_on_size(INBOX_DIR, inbox_mail)
-
-            # Add to an undo queue in order to unrecognize mistakely recognized sender addresses.
-            if modified:
-                undo_q.put(new_filename.split(',')[0])
+            rename_file_based_on_size(INBOX_DIR, inbox_mail)
 
         else:
-            # If message is inside the undo queue, that is, if message is read before but the
-            # user decides to unrecognize the message and therefore marks the message as unread.
-            if inbox_mail.split(',')[0] in undo_q.queue:
+            # In order to allow the user to unrecognize mistakely recognized sender addresses,
+            # we need to find mails that are previously checked and previously marked as seen.
+            # Therefore, we need to find the mails in inbox_previous that have the flag 'S' (seen).
+            # If the user now marks these mails as unseen from seen, these mails' sender addresses
+            # will be changed from recognized to unrecognized.
+            will_unrecognize = False
+            for mail_previous in inbox_previous:
+                previous_flags = mail_previous.split(',')[-1]
+
+                if (inbox_mail.split(',')[0] == mail_previous.split(',')[0] and 'S' in previous_flags):
+                    will_unrecognize = True
+                    break
+            
+            if will_unrecognize:
                 msg = ""
                 headers = ""
                 with open(filepath, "r+") as f:
@@ -210,6 +214,13 @@ def process_userdir(USER_DIR):
         userdir_to_maildir_to_setname_to_set[USER_DIR][INBOX_DIR_FROM_USER_DIR]['checked'].add(inbox_mail)
 
 
+    '''Avoid redundant check'''
+    # The set of checked mails must be updated so that these mails exist in the current step.
+    # Otherwise, after some user actions and if the mails have the same name again in the future,
+    # these mails will not be checked and there will be bugs.
+    userdir_to_maildir_to_setname_to_set[USER_DIR][INBOX_DIR_FROM_USER_DIR]['checked'] = inbox_all.intersection(userdir_to_maildir_to_setname_to_set[USER_DIR][INBOX_DIR_FROM_USER_DIR]['checked'])
+
+
     '''
     JUNK_DIR
     '''
@@ -220,7 +231,6 @@ def process_userdir(USER_DIR):
 
     # Avoid redundant check
     userdir_to_maildir_to_setname_to_set[USER_DIR][JUNK_DIR_FROM_USER_DIR]['all'] = junk_all
-    userdir_to_maildir_to_setname_to_set[USER_DIR][JUNK_DIR_FROM_USER_DIR]['checked'] = junk_all.intersection(userdir_to_maildir_to_setname_to_set[USER_DIR][JUNK_DIR_FROM_USER_DIR]['checked'])
     junk_checked = userdir_to_maildir_to_setname_to_set[USER_DIR][JUNK_DIR_FROM_USER_DIR]['checked'] 
     junk_unchecked = junk_all.difference(junk_checked)
 
@@ -247,6 +257,10 @@ def process_userdir(USER_DIR):
         userdir_to_maildir_to_setname_to_set[USER_DIR][JUNK_DIR_FROM_USER_DIR]['checked'].add(junk_mail)
 
 
+    # Avoid redundant check
+    userdir_to_maildir_to_setname_to_set[USER_DIR][JUNK_DIR_FROM_USER_DIR]['checked'] = junk_all.intersection(userdir_to_maildir_to_setname_to_set[USER_DIR][JUNK_DIR_FROM_USER_DIR]['checked'])
+
+
     logger.info(f'Time elapsed for processing {USER_DIR}: {datetime.datetime.now() - start_time}')
 
 
@@ -264,7 +278,7 @@ def main():
 
         except (sqlite3.OperationalError) as e:
             logger.error(f'{e}')
-            init_db()
+            init_db(conn, logger=logger)
 
         try:
             process_userdir(USER_DIRS[0])
