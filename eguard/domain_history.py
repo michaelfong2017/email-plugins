@@ -8,7 +8,7 @@ from util.arg_parser import *
 import os
 import time
 
-import email
+
 import re
 
 from daemonize import Daemonize
@@ -68,7 +68,7 @@ for userdir in USER_DIRS:
     userdir_to_maildir_to_setname_to_set[userdir] = {}
     for maildir in [INBOX_DIR_FROM_USER_DIR, JUNK_DIR_FROM_USER_DIR]:
         userdir_to_maildir_to_setname_to_set[userdir][maildir] = {}
-        for setname in ['checked', 'all']:
+        for setname in ['checked']:
             userdir_to_maildir_to_setname_to_set[userdir][maildir][setname] = set()
 
 logger.info(f'userdir_to_maildir_to_setname_to_set: {userdir_to_maildir_to_setname_to_set}')
@@ -100,14 +100,18 @@ def process_userdir(USER_DIR):
     inbox_all = set([f.name for f in os.scandir(INBOX_DIR)])
 
     '''Avoid redundant check'''
-    userdir_to_maildir_to_setname_to_set[USER_DIR][INBOX_DIR_FROM_USER_DIR]['all'] = inbox_all
-
     # The set of mails that are previously checked.
     inbox_checked = userdir_to_maildir_to_setname_to_set[USER_DIR][INBOX_DIR_FROM_USER_DIR]['checked'] 
 
     # The set of mails that are previously checked but do not exist in the current mail directory.
     # This means that these mails have been altered, usually the flags are altered.
     inbox_previous = inbox_checked.difference(inbox_all)
+
+    # The set of checked mails must be updated so that these mails exist in the current step.
+    # Otherwise, after some user actions and if the mails have the same name again in the future,
+    # these mails will not be checked and there will be bugs.
+    userdir_to_maildir_to_setname_to_set[USER_DIR][INBOX_DIR_FROM_USER_DIR]['checked'] = inbox_all.intersection(userdir_to_maildir_to_setname_to_set[USER_DIR][INBOX_DIR_FROM_USER_DIR]['checked'])
+    inbox_checked = userdir_to_maildir_to_setname_to_set[USER_DIR][INBOX_DIR_FROM_USER_DIR]['checked'] 
 
     # The set of mails that are not checked previously and are about to be checked.
     inbox_unchecked = inbox_all.difference(inbox_checked)
@@ -124,33 +128,17 @@ def process_userdir(USER_DIR):
 
         # If message is read, mark as recognized in database.
         if ('S' in flags):
-            msg = ""
-            headers = ""
-            with open(filepath, "r+") as f:
-                # Get msg and headers from file for further processing
-                msg = email.message_from_file(f) # Whole email message including both headers and content
-                parser = email.parser.HeaderParser()
-                headers = parser.parsestr(msg.as_string())
+            # Remove banner from Subject if exists
+            remove_banner_from_subject(filepath)
 
-                body_plain, body_html = find_body_plain_and_html_from_message(msg)
-                
-                logger.info('yoyoyoyo')
-                logger.info(headers)
-                logger.info(body_plain)
-                logger.info(body_html)
-
-                # Remove banner from Subject if exists
-                remove_banner_from_subject(msg, f, headers=headers)
-
+            # Remove the previously prepended warning banner from mail body (have to handle for both plain and html)
+            remove_banner_from_body(filepath)
 
             # Find address from the message
-            address = find_address_from_message(msg, headers=headers)
+            address = find_address_from_message(filepath)
 
             # Insert the address to known sender
             insert_address_to_known_sender(address, conn, logger=logger)
-
-            # Rename file based on size
-            rename_file_based_on_size(INBOX_DIR, inbox_mail)
 
         else:
             # In order to allow the user to unrecognize mistakely recognized sender addresses,
@@ -167,58 +155,40 @@ def process_userdir(USER_DIR):
                     break
             
             if will_unrecognize:
-                msg = ""
-                headers = ""
-                with open(filepath, "r+") as f:
-                    # Get msg and headers from file for further processing
-                    msg = email.message_from_file(f) # Whole email message including both headers and content
-                    parser = email.parser.HeaderParser()
-                    headers = parser.parsestr(msg.as_string())
+                # Add banner to Subject
+                add_banner_to_subject(filepath)
 
-                    # Add banner to Subject
-                    add_banner_to_subject(msg, f, headers=headers)
+                # Add banner to body
+                prepend_banner_to_body(filepath)
+
 
                 # Find address from the message
-                address = find_address_from_message(msg, headers=headers)
+                address = find_address_from_message(filepath)
 
                 # Delete the address from known sender
                 delete_address_from_known_sender(address, conn, logger=logger)
                 
-                # Rename file based on size
-                rename_file_based_on_size(INBOX_DIR, inbox_mail)
-
-
             else:
                 # If message is unread, add a warning banner to the subject.
-                msg = ""
-                headers = ""
-                with open(filepath, "r+") as f:
-                    # Get msg and headers from file for further processing
-                    msg = email.message_from_file(f) # Whole email message including both headers and content
-                    parser = email.parser.HeaderParser()
-                    headers = parser.parsestr(msg.as_string())
+                
+                # Find address from the message
+                address = find_address_from_message(filepath)
     
-                    # Find address from the message
-                    address = find_address_from_message(msg, headers=headers)
+                # Add banner to Subject if record does not exist in database
+                if not is_address_exists_in_known_sender(address, conn, logger=logger) == True:
+                    add_banner_to_subject(filepath)
+
+                    # Add banner to body
+                    prepend_banner_to_body(filepath)
+                else:
+                    pass
+
     
-                    # Add banner to Subject if record does not exist in database
-                    if not is_address_exists_in_known_sender(address, conn, logger=logger) == True:
-                        add_banner_to_subject(msg, f, headers=headers)
-                    else:
-                        pass
-    
-    
-                # Rename file based on size
-                rename_file_based_on_size(INBOX_DIR, inbox_mail)
+        # Rename file based on size
+        new_filename = rename_file_based_on_size(INBOX_DIR, inbox_mail)
             
-        userdir_to_maildir_to_setname_to_set[USER_DIR][INBOX_DIR_FROM_USER_DIR]['checked'].add(inbox_mail)
+        userdir_to_maildir_to_setname_to_set[USER_DIR][INBOX_DIR_FROM_USER_DIR]['checked'].add(new_filename)
 
-
-    '''Avoid redundant check'''
-    # The set of checked mails must be updated so that these mails exist in the current step.
-    # Otherwise, after some user actions and if the mails have the same name again in the future,
-    # these mails will not be checked and there will be bugs.
-    userdir_to_maildir_to_setname_to_set[USER_DIR][INBOX_DIR_FROM_USER_DIR]['checked'] = inbox_all.intersection(userdir_to_maildir_to_setname_to_set[USER_DIR][INBOX_DIR_FROM_USER_DIR]['checked'])
 
 
     '''
@@ -230,7 +200,7 @@ def process_userdir(USER_DIR):
     junk_all = set([f.name for f in os.scandir(JUNK_DIR)])
 
     # Avoid redundant check
-    userdir_to_maildir_to_setname_to_set[USER_DIR][JUNK_DIR_FROM_USER_DIR]['all'] = junk_all
+    userdir_to_maildir_to_setname_to_set[USER_DIR][JUNK_DIR_FROM_USER_DIR]['checked'] = junk_all.intersection(userdir_to_maildir_to_setname_to_set[USER_DIR][JUNK_DIR_FROM_USER_DIR]['checked'])
     junk_checked = userdir_to_maildir_to_setname_to_set[USER_DIR][JUNK_DIR_FROM_USER_DIR]['checked'] 
     junk_unchecked = junk_all.difference(junk_checked)
 
@@ -241,24 +211,13 @@ def process_userdir(USER_DIR):
 
         filepath = os.path.join(JUNK_DIR, junk_mail)
 
-        with open(filepath, "r") as f:
-            # Get msg and headers from file for further processing
-            msg = email.message_from_file(f) # Whole email message including both headers and content
-            parser = email.parser.HeaderParser()
-            headers = parser.parsestr(msg.as_string())
+        # Find address from the message
+        address = find_address_from_message(filepath)
 
-            # Find address from the message
-            address = find_address_from_message(msg, headers=headers)
-
-            # Delete the address from known sender
-            delete_address_from_known_sender(address, conn, logger=logger)
-
+        # Delete the address from known sender
+        insert_address_to_junk_sender(address, conn, logger=logger)
 
         userdir_to_maildir_to_setname_to_set[USER_DIR][JUNK_DIR_FROM_USER_DIR]['checked'].add(junk_mail)
-
-
-    # Avoid redundant check
-    userdir_to_maildir_to_setname_to_set[USER_DIR][JUNK_DIR_FROM_USER_DIR]['checked'] = junk_all.intersection(userdir_to_maildir_to_setname_to_set[USER_DIR][JUNK_DIR_FROM_USER_DIR]['checked'])
 
 
     logger.info(f'Time elapsed for processing {USER_DIR}: {datetime.datetime.now() - start_time}')
