@@ -8,9 +8,7 @@ from util.arg_parser import *
 import os
 import time
 
-
-import re
-
+# daemonize - run as background process
 from daemonize import Daemonize
 
 # sqlite3
@@ -19,11 +17,9 @@ import sqlite3
 import datetime
 
 
-# Read config file
+# Read config file - .toml is the config file format
 import toml
 
-# Undo queue
-from queue import Queue
 
 # Handle arguments from command line
 args = parse_args()
@@ -120,75 +116,79 @@ def process_userdir(USER_DIR):
     logger.info(f'inbox_unchecked length: {len(inbox_unchecked)}')
 
     for inbox_mail in inbox_unchecked:
-        logger.info(f"Checking email {inbox_mail}")
+        try:
+            logger.info(f"Checking email {inbox_mail}")
 
-        filepath = os.path.join(INBOX_DIR, inbox_mail)
+            filepath = os.path.join(INBOX_DIR, inbox_mail)
 
-        flags = inbox_mail.split(',')[-1]
+            flags = inbox_mail.split(',')[-1]
 
-        # If message is read, mark as recognized in database.
-        if ('S' in flags):
-            # Remove banner from Subject if exists
-            remove_banner_from_subject(filepath)
+            # If message is read, mark as recognized in database.
+            if ('S' in flags):
+                # Remove banner from Subject if exists
+                remove_banner_from_subject(filepath)
 
-            # Remove the previously prepended warning banner from mail body (have to handle for both plain and html)
-            remove_banner_from_body(filepath)
-
-            # Find address from the message
-            address = find_address_from_message(filepath)
-
-            # Insert the address to known sender
-            insert_address_to_known_sender(address, conn, logger=logger)
-
-        else:
-            # In order to allow the user to unrecognize mistakely recognized sender addresses,
-            # we need to find mails that are previously checked and previously marked as seen.
-            # Therefore, we need to find the mails in inbox_previous that have the flag 'S' (seen).
-            # If the user now marks these mails as unseen from seen, these mails' sender addresses
-            # will be changed from recognized to unrecognized.
-            will_unrecognize = False
-            for mail_previous in inbox_previous:
-                previous_flags = mail_previous.split(',')[-1]
-
-                if (inbox_mail.split(',')[0] == mail_previous.split(',')[0] and 'S' in previous_flags):
-                    will_unrecognize = True
-                    break
-            
-            if will_unrecognize:
-                # Add banner to Subject
-                add_banner_to_subject(filepath)
-
-                # Add banner to body
-                prepend_banner_to_body(filepath)
-
+                # Remove the previously prepended warning banner from mail body (have to handle for both plain and html)
+                remove_banner_from_body(filepath)
 
                 # Find address from the message
                 address = find_address_from_message(filepath)
 
-                # Delete the address from known sender
-                delete_address_from_known_sender(address, conn, logger=logger)
-                
+                # Insert the address to known sender
+                insert_address_to_known_sender(address, conn, logger=logger)
+
             else:
-                # If message is unread, add a warning banner to the subject.
-                
-                # Find address from the message
-                address = find_address_from_message(filepath)
-    
-                # Add banner to Subject if record does not exist in database
-                if not is_address_exists_in_known_sender(address, conn, logger=logger) == True:
+                # In order to allow the user to unrecognize mistakely recognized sender addresses,
+                # we need to find mails that are previously checked and previously marked as seen.
+                # Therefore, we need to find the mails in inbox_previous that have the flag 'S' (seen).
+                # If the user now marks these mails as unseen from seen, these mails' sender addresses
+                # will be changed from recognized to unrecognized.
+                will_unrecognize = False
+                for mail_previous in inbox_previous:
+                    previous_flags = mail_previous.split(',')[-1]
+
+                    if (inbox_mail.split(',')[0] == mail_previous.split(',')[0] and 'S' in previous_flags):
+                        will_unrecognize = True
+                        break
+                    
+                if will_unrecognize:
+                    # Add banner to Subject
                     add_banner_to_subject(filepath)
 
                     # Add banner to body
                     prepend_banner_to_body(filepath)
+
+
+                    # Find address from the message
+                    address = find_address_from_message(filepath)
+
+                    # Delete the address from known sender
+                    delete_address_from_known_sender(address, conn, logger=logger)
+
                 else:
-                    pass
+                    # If message is unread, add a warning banner to the subject.
 
-    
-        # Rename file based on size
-        new_filename = rename_file_based_on_size(INBOX_DIR, inbox_mail)
-            
-        userdir_to_maildir_to_setname_to_set[USER_DIR][INBOX_DIR_FROM_USER_DIR]['checked'].add(new_filename)
+                    # Find address from the message
+                    address = find_address_from_message(filepath)
 
+                    # Add banner to Subject if record does not exist in database
+                    if not is_address_exists_in_known_sender(address, conn, logger=logger) == True:
+                        add_banner_to_subject(filepath)
+
+                        # Add banner to body
+                        prepend_banner_to_body(filepath)
+                    else:
+                        pass
+
+                    
+            # Rename file based on size
+            new_filename = rename_file_based_on_size(INBOX_DIR, inbox_mail)
+
+            userdir_to_maildir_to_setname_to_set[USER_DIR][INBOX_DIR_FROM_USER_DIR]['checked'].add(new_filename)
+
+
+        except FileNotFoundError as e:
+            logger.error(f'{e}')
 
 
     '''
@@ -207,18 +207,21 @@ def process_userdir(USER_DIR):
     logger.info(f'junk_unchecked length: {len(junk_unchecked)}')
 
     for junk_mail in junk_unchecked:
-        logger.info(f"Checking email {junk_mail}")
+        try:
+            logger.info(f"Checking email {junk_mail}")
 
-        filepath = os.path.join(JUNK_DIR, junk_mail)
+            filepath = os.path.join(JUNK_DIR, junk_mail)
 
-        # Find address from the message
-        address = find_address_from_message(filepath)
+            # Find address from the message
+            address = find_address_from_message(filepath)
 
-        # Delete the address from known sender
-        insert_address_to_junk_sender(address, conn, logger=logger)
+            # Delete the address from known sender
+            insert_address_to_junk_sender(address, conn, logger=logger)
 
-        userdir_to_maildir_to_setname_to_set[USER_DIR][JUNK_DIR_FROM_USER_DIR]['checked'].add(junk_mail)
+            userdir_to_maildir_to_setname_to_set[USER_DIR][JUNK_DIR_FROM_USER_DIR]['checked'].add(junk_mail)
 
+        except FileNotFoundError as e:
+            logger.error(f'{e}')
 
     logger.info(f'Time elapsed for processing {USER_DIR}: {datetime.datetime.now() - start_time}')
 
