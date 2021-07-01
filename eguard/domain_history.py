@@ -28,7 +28,7 @@ DEBUG = args.debug
 
 # Logger
 logger, keep_fds = create_logger(debug=DEBUG)
-
+ 
 # Path
 THIS_DIR = os.path.dirname(os.path.abspath(__file__))
 
@@ -36,19 +36,22 @@ THIS_DIR = os.path.dirname(os.path.abspath(__file__))
 config = toml.load(os.path.join(THIS_DIR, 'eguard.toml'))
 
 try:
-    if 'UserDirectories' in config['Path']:
-        USER_DIRS = config['Path']['UserDirectories']
+    if 'UserEmailsToDirectories' in config['Path']:
+        USER_EMAILS_TO_DIRS = config['Path']['UserEmailsToDirectories']
     else:
         MAIL_DIR = config['Path']['MailDir']
-        USER_DIRS = [f.path for f in os.scandir(MAIL_DIR) if f.is_dir()]
+        USER_EMAILS_TO_DIRS = {f.name: f.path for f in os.scandir(MAIL_DIR) if f.is_dir()}
 
     INBOX_DIR_FROM_USER_DIR = config['Path']['InboxDirFromUserDir']
     JUNK_DIR_FROM_USER_DIR = config['Path']['JunkDirFromUserDir']
 
+    USER_EMAILS = [user_email for user_email, _ in USER_EMAILS_TO_DIRS.items()]
+    USER_DIRS = [userdir for _, userdir in USER_EMAILS_TO_DIRS.items()]
+
 except KeyError as e:
     logger.error(f'{e}\nPlease check that the above key is properly defined in the configuration file.')
 
-logger.info(f'USER_DIRS: {USER_DIRS}')
+logger.info(f'USER_EMAILS_TO_DIRS: {USER_EMAILS_TO_DIRS}')
 logger.info(f'INBOX_DIR_FROM_USER_DIR: {INBOX_DIR_FROM_USER_DIR}')
 logger.info(f'JUNK_DIR_FROM_USER_DIR: {JUNK_DIR_FROM_USER_DIR}')
 
@@ -84,20 +87,20 @@ def connect_db():
     logger.info(f'Time elapsed for connecting to the database: {datetime.datetime.now() - start_time}')
 
 
-def process_userdir(USER_DIR):
+def process_userdir(user_email, user_dir):
     start_time = datetime.datetime.now()
 
     '''
     INBOX_DIR
     '''
-    INBOX_DIR = os.path.join(USER_DIR, INBOX_DIR_FROM_USER_DIR)
+    INBOX_DIR = os.path.join(user_dir, INBOX_DIR_FROM_USER_DIR)
     logger.info(f"Entering inbox directory {INBOX_DIR}")
 
     inbox_all = set([f.name for f in os.scandir(INBOX_DIR)])
 
     '''Avoid redundant check'''
     # The set of mails that are previously checked.
-    inbox_checked = userdir_to_maildir_to_setname_to_set[USER_DIR][INBOX_DIR_FROM_USER_DIR]['checked'] 
+    inbox_checked = userdir_to_maildir_to_setname_to_set[user_dir][INBOX_DIR_FROM_USER_DIR]['checked'] 
 
     # The set of mails that are previously checked but do not exist in the current mail directory.
     # This means that these mails have been altered, usually the flags are altered.
@@ -106,8 +109,8 @@ def process_userdir(USER_DIR):
     # The set of checked mails must be updated so that these mails exist in the current step.
     # Otherwise, after some user actions and if the mails have the same name again in the future,
     # these mails will not be checked and there will be bugs.
-    userdir_to_maildir_to_setname_to_set[USER_DIR][INBOX_DIR_FROM_USER_DIR]['checked'] = inbox_all.intersection(userdir_to_maildir_to_setname_to_set[USER_DIR][INBOX_DIR_FROM_USER_DIR]['checked'])
-    inbox_checked = userdir_to_maildir_to_setname_to_set[USER_DIR][INBOX_DIR_FROM_USER_DIR]['checked'] 
+    userdir_to_maildir_to_setname_to_set[user_dir][INBOX_DIR_FROM_USER_DIR]['checked'] = inbox_all.intersection(userdir_to_maildir_to_setname_to_set[user_dir][INBOX_DIR_FROM_USER_DIR]['checked'])
+    inbox_checked = userdir_to_maildir_to_setname_to_set[user_dir][INBOX_DIR_FROM_USER_DIR]['checked'] 
 
     # The set of mails that are not checked previously and are about to be checked.
     inbox_unchecked = inbox_all.difference(inbox_checked)
@@ -128,7 +131,7 @@ def process_userdir(USER_DIR):
 
             # If the sender address of the message is in the junk sender list,
             # always add the junk warning banner.
-            if is_address_exists_in_junk_sender(address, conn, logger):
+            if is_address_exists_in_junk_sender(address, conn, logger=logger):
                 '''
                 Remove previously added unknown subject and unknown banner, if exist.
                 '''
@@ -160,7 +163,7 @@ def process_userdir(USER_DIR):
                     remove_banner_from_body(filepath, is_junk=False)
     
                     # Insert the address to known sender
-                    insert_address_to_known_sender(address, conn, logger=logger)
+                    insert_address_to_known_sender(user_email, address, conn, logger=logger)
     
                 else:
                     # In order to allow the user to unrecognize mistakely recognized sender addresses,
@@ -184,12 +187,12 @@ def process_userdir(USER_DIR):
                         add_banner_to_body(filepath, is_junk=False)
     
                         # Delete the address from known sender
-                        delete_address_from_known_sender(address, conn, logger=logger)
+                        delete_address_from_known_sender(user_email, address, conn, logger=logger)
     
                     else:
                         # If message is unread, add a warning banner to the subject.
                         # Add banner to Subject if record does not exist in database
-                        if not is_address_exists_in_known_sender(address, conn, logger=logger) == True:
+                        if not is_address_exists_in_known_sender(user_email, address, conn, logger=logger) == True:
                             add_banner_to_subject(filepath)
     
                             # Add banner to body
@@ -201,7 +204,7 @@ def process_userdir(USER_DIR):
             # Rename file based on size
             new_filename = rename_file_based_on_size(INBOX_DIR, inbox_mail)
 
-            userdir_to_maildir_to_setname_to_set[USER_DIR][INBOX_DIR_FROM_USER_DIR]['checked'].add(new_filename)
+            userdir_to_maildir_to_setname_to_set[user_dir][INBOX_DIR_FROM_USER_DIR]['checked'].add(new_filename)
 
 
         except FileNotFoundError as e:
@@ -211,14 +214,14 @@ def process_userdir(USER_DIR):
     '''
     JUNK_DIR
     '''
-    JUNK_DIR = os.path.join(USER_DIR, JUNK_DIR_FROM_USER_DIR)
+    JUNK_DIR = os.path.join(user_dir, JUNK_DIR_FROM_USER_DIR)
     logger.info(f"Entering junk directory {JUNK_DIR}")
 
     junk_all = set([f.name for f in os.scandir(JUNK_DIR)])
 
     # Avoid redundant check
-    userdir_to_maildir_to_setname_to_set[USER_DIR][JUNK_DIR_FROM_USER_DIR]['checked'] = junk_all.intersection(userdir_to_maildir_to_setname_to_set[USER_DIR][JUNK_DIR_FROM_USER_DIR]['checked'])
-    junk_checked = userdir_to_maildir_to_setname_to_set[USER_DIR][JUNK_DIR_FROM_USER_DIR]['checked'] 
+    userdir_to_maildir_to_setname_to_set[user_dir][JUNK_DIR_FROM_USER_DIR]['checked'] = junk_all.intersection(userdir_to_maildir_to_setname_to_set[user_dir][JUNK_DIR_FROM_USER_DIR]['checked'])
+    junk_checked = userdir_to_maildir_to_setname_to_set[user_dir][JUNK_DIR_FROM_USER_DIR]['checked'] 
     junk_unchecked = junk_all.difference(junk_checked)
 
     logger.info(f'junk_unchecked length: {len(junk_unchecked)}')
@@ -244,32 +247,34 @@ def process_userdir(USER_DIR):
             # Rename file based on size
             new_filename = rename_file_based_on_size(JUNK_DIR, junk_mail)
 
-            userdir_to_maildir_to_setname_to_set[USER_DIR][JUNK_DIR_FROM_USER_DIR]['checked'].add(new_filename)
+            userdir_to_maildir_to_setname_to_set[user_dir][JUNK_DIR_FROM_USER_DIR]['checked'].add(new_filename)
 
         except FileNotFoundError as e:
             logger.error(f'{e}')
 
-    logger.info(f'Time elapsed for processing {USER_DIR}: {datetime.datetime.now() - start_time}')
+    logger.info(f'Time elapsed for processing {user_dir}: {datetime.datetime.now() - start_time}')
 
 
 def main():
     while True:
         try:
-            conn.execute(f'SELECT count(*) FROM known_sender')
+            conn.execute(f'SELECT count(*) FROM junk_sender')
 
         except (NameError, sqlite3.ProgrammingError) as e:
             logger.error(f'{e}')
             connect_db()
 
         try:
-            conn.execute(f'SELECT count(*) FROM known_sender')
+            conn.execute(f'SELECT count(*) FROM junk_sender')
 
         except (sqlite3.OperationalError) as e:
             logger.error(f'{e}')
-            init_db(conn, logger=logger)
+            logger.info(f'yoyoyoyo{USER_EMAILS}')
+            init_db(conn, USER_EMAILS, logger=logger)
 
         try:
-            process_userdir(USER_DIRS[0])
+            for user_email, userdir in USER_EMAILS_TO_DIRS.items():
+                process_userdir(user_email, userdir)
 
         finally:
             if conn:
