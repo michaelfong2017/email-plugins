@@ -9,6 +9,7 @@ from email.mime.text import MIMEText
 import re
 
 import os
+import shutil
 
 UNKNOWN_SUBJECT = '''[FROM NEW SENDER] '''
 
@@ -118,17 +119,22 @@ def find_address_from_message(filepath):
 
 
 # Rename file based on size
-def rename_file_based_on_size(INBOX_DIR, inbox_mail):
-    filepath = os.path.join(INBOX_DIR, inbox_mail)
+def rename_file_based_on_size(MAIL_DIR, filename):
+    filepath = os.path.join(MAIL_DIR, filename)
 
     new_file_size = os.stat(filepath).st_size
 
-    new_filename = re.sub(r',S=[0-9]*,', f',S={new_file_size},', inbox_mail)
+    new_filename = re.sub(r',S=[0-9]*,', f',S={new_file_size},', filename)
 
-    os.rename(filepath, os.path.join(INBOX_DIR, new_filename))
+    os.rename(filepath, os.path.join(MAIL_DIR, new_filename))
 
     return new_filename
     
+
+# Move junk mail to junk folder
+def move_to_junk_folder(INBOX_DIR, JUNK_DIR, filename):
+    shutil.move(os.path.join(INBOX_DIR, filename), os.path.join(JUNK_DIR, filename))
+
 
 # Remove the previously prepended warning banner from mail body (have to handle for both plain and html)
 def remove_banner_from_body(filepath, is_junk=False):

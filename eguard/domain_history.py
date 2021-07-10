@@ -90,10 +90,12 @@ def connect_db():
 def process_userdir(user_email, user_dir):
     start_time = datetime.datetime.now()
 
+    INBOX_DIR = os.path.join(user_dir, INBOX_DIR_FROM_USER_DIR)
+    JUNK_DIR = os.path.join(user_dir, JUNK_DIR_FROM_USER_DIR)
+
     '''
     INBOX_DIR
     '''
-    INBOX_DIR = os.path.join(user_dir, INBOX_DIR_FROM_USER_DIR)
     logger.info(f"Entering inbox directory {INBOX_DIR}")
 
     inbox_all = set([f.name for f in os.scandir(INBOX_DIR)])
@@ -143,6 +145,16 @@ def process_userdir(user_email, user_dir):
                 add_banner_to_subject(filepath, is_junk=True)
 
                 add_banner_to_body(filepath, is_junk=True)
+
+                # Rename file based on size
+                new_filename = rename_file_based_on_size(INBOX_DIR, inbox_mail)
+
+                # Move junk mail to junk folder
+                move_to_junk_folder(INBOX_DIR, JUNK_DIR, new_filename)
+
+                # Mark the mail as checked for the junk dir instead of
+                # the inbox dir since the mail has been moved.
+                userdir_to_maildir_to_setname_to_set[user_dir][JUNK_DIR_FROM_USER_DIR]['checked'].add(new_filename)
 
             # If the sender address is not in the junk list, handle different cases.
             else:
@@ -201,10 +213,10 @@ def process_userdir(user_email, user_dir):
                             pass
                         
                         
-            # Rename file based on size
-            new_filename = rename_file_based_on_size(INBOX_DIR, inbox_mail)
+                # Rename file based on size
+                new_filename = rename_file_based_on_size(INBOX_DIR, inbox_mail)
 
-            userdir_to_maildir_to_setname_to_set[user_dir][INBOX_DIR_FROM_USER_DIR]['checked'].add(new_filename)
+                userdir_to_maildir_to_setname_to_set[user_dir][INBOX_DIR_FROM_USER_DIR]['checked'].add(new_filename)
 
 
         except FileNotFoundError as e:
@@ -214,7 +226,6 @@ def process_userdir(user_email, user_dir):
     '''
     JUNK_DIR
     '''
-    JUNK_DIR = os.path.join(user_dir, JUNK_DIR_FROM_USER_DIR)
     logger.info(f"Entering junk directory {JUNK_DIR}")
 
     junk_all = set([f.name for f in os.scandir(JUNK_DIR)])
