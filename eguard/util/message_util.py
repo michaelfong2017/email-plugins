@@ -17,18 +17,22 @@ import shutil
 ########
 UNKNOWN_SUBJECT = '''[FROM NEW SENDER] '''
 JUNK_SUBJECT = '''[JUNK MAIL] '''
-UNKNOWN_BANNER_HTML = '''<p style="margin: 10px 20%; text-align: center; border: 2px solid; background-color: #ff7400; padding: 5px;"><span>注意：這是首次接收到的電郵地址。除非您確保其真確性，否則請留意當中所附有的超連結，附件或銀行帳戶資料。如有疑問，請尋求技術人員的支援。</span><br />Caution: The domain of email sender is first seen. &nbsp;Beware of any hyperlink, attachment and bank account information unless you ensure the authenticity of the sender. &nbsp;Seek IT assistance if in doubt.&nbsp;&nbsp;</p>\n'''
-JUNK_BANNER_HTML = '''<p style="margin: 10px 20%; text-align: center; border: 2px solid; background-color: #ff4444; padding: 5px;"><span>注意：這是曾被舉報為垃圾發件人的電郵地址。除非您確保其真確性，否則請留意當中所附有的超連結，附件或銀行帳戶資料。如有疑問，請尋求技術人員的支援。</span><br />Warning: The domain of email sender was reported as a junk sender. &nbsp;Beware of any hyperlink, attachment and bank account information unless you ensure the authenticity of the sender. &nbsp;Seek IT assistance if in doubt.&nbsp;&nbsp;</p>\n'''
+UNKNOWN_BANNER_HTML = '''<p style="margin: 10px 20%; text-align: center; border: 2px solid; background-color: #ff7400; padding: 5px;"><span>注意：<br />這是首次接收到的電郵地址。除非您確保其真確性，否則請留意當中所附有的超連結，附件或銀行帳戶資料。如有疑問，請尋求技術人員的支援。</span><br />CAUTION:<br/>The domain of email sender is first seen. &nbsp;Beware of any hyperlink, attachment and bank account information unless you ensure the authenticity of the sender. &nbsp;Seek IT assistance if in doubt.&nbsp;&nbsp;</p>\n'''
+JUNK_BANNER_HTML = '''<p style="margin: 10px 20%; text-align: center; border: 2px solid; background-color: #ff4444; padding: 5px;"><span>注意：<br />這是曾被舉報為垃圾發件人的電郵地址。除非您確保其真確性，否則請留意當中所附有的超連結，附件或銀行帳戶資料。如有疑問，請尋求技術人員的支援。</span><br />WARNING:<br />The domain of email sender was reported as a junk sender. &nbsp;Beware of any hyperlink, attachment and bank account information unless you ensure the authenticity of the sender. &nbsp;Seek IT assistance if in doubt.&nbsp;&nbsp;</p>\n'''
 
-UNKNOWN_BANNER_PLAIN = '''注意：這是首次接收到的電郵地址。除非您確保其真確性，否則請留意當中所附有的超連結，附件或銀行帳戶資料。如有疑問，請尋求技術人員的支援。
-Caution: The domain of email sender is first seen.  Beware of any
+UNKNOWN_BANNER_PLAIN = '''注意：
+這是首次接收到的電郵地址。除非您確保其真確性，否則請留意當中所附有的超連結，附件或銀行帳戶資料。如有疑問，請尋求技術人員的支援。
+CAUTION: 
+The domain of email sender is first seen.  Beware of any
 hyperlink, attachment and bank account information unless you ensure the
 authenticity of the sender.  Seek IT assistance if in doubt.  
 
 '''
 
-JUNK_BANNER_PLAIN = '''警告：這是曾被舉報為垃圾發件人的電郵地址。除非您確保其真確性，否則請留意當中所附有的超連結，附件或銀行帳戶資料。如有疑問，請尋求技術人員的支援。
-Warning: The domain of email sender was reported as a junk sender.  Beware of any
+JUNK_BANNER_PLAIN = '''警告：
+這是曾被舉報為垃圾發件人的電郵地址。除非您確保其真確性，否則請留意當中所附有的超連結，附件或銀行帳戶資料。如有疑問，請尋求技術人員的支援。
+WARNING: 
+The domain of email sender was reported as a junk sender.  Beware of any
 hyperlink, attachment and bank account information unless you ensure the
 authenticity of the sender.  Seek IT assistance if in doubt.  
 
@@ -46,20 +50,24 @@ authenticity of the sender.  Seek IT assistance if in doubt.
 ########
 PREV_UNKNOWN_SUBJECT = '''[FROM NEW SENDER] '''
 PREV_JUNK_SUBJECT = '''[JUNK MAIL] '''
-PREV_UNKNOWN_BANNER_HTML = '''<p style="margin: 10px 20%; text-align: center; border: 2px solid; background-color: #ff7400; padding: 5px;">Caution: The domain of email sender is first seen. &nbsp;Beware of any hyperlink, attachment and bank account information unless you ensure the authenticity of the sender. &nbsp;Seek IT assistance if in doubt.&nbsp;&nbsp;<br /><span>注意：這是首次接收到的電郵地址。除非您確保其真確性，否則請留意當中所附有的超連結，附件或銀行帳戶資料。如有疑問，請尋求技術人員的支援。</span></p>\n'''
-PREV_JUNK_BANNER_HTML = '''<p style="margin: 10px 20%; text-align: center; border: 2px solid; background-color: #ff4444; padding: 5px;">Warning: The domain of email sender was reported as a junk sender. &nbsp;Beware of any hyperlink, attachment and bank account information unless you ensure the authenticity of the sender. &nbsp;Seek IT assistance if in doubt.&nbsp;&nbsp;<br /><span>注意：這是曾被舉報為垃圾發件人的電郵地址。除非您確保其真確性，否則請留意當中所附有的超連結，附件或銀行帳戶資料。如有疑問，請尋求技術人員的支援。</span></p>\n'''
+PREV_UNKNOWN_BANNER_HTML = '''<p style="margin: 10px 20%; text-align: center; border: 2px solid; background-color: #ff7400; padding: 5px;"><span>注意：<br />這是首次接收到的電郵地址。除非您確保其真確性，否則請留意當中所附有的超連結，附件或銀行帳戶資料。如有疑問，請尋求技術人員的支援。</span><br />CAUTION:<br/>The domain of email sender is first seen. &nbsp;Beware of any hyperlink, attachment and bank account information unless you ensure the authenticity of the sender. &nbsp;Seek IT assistance if in doubt.&nbsp;&nbsp;</p>\n'''
+PREV_JUNK_BANNER_HTML = '''<p style="margin: 10px 20%; text-align: center; border: 2px solid; background-color: #ff4444; padding: 5px;"><span>注意：<br />這是曾被舉報為垃圾發件人的電郵地址。除非您確保其真確性，否則請留意當中所附有的超連結，附件或銀行帳戶資料。如有疑問，請尋求技術人員的支援。</span><br />WARNING:<br />The domain of email sender was reported as a junk sender. &nbsp;Beware of any hyperlink, attachment and bank account information unless you ensure the authenticity of the sender. &nbsp;Seek IT assistance if in doubt.&nbsp;&nbsp;</p>\n'''
 
-PREV_UNKNOWN_BANNER_PLAIN = '''Caution: The domain of email sender is first seen.  Beware of any
+PREV_UNKNOWN_BANNER_PLAIN = '''注意：
+這是首次接收到的電郵地址。除非您確保其真確性，否則請留意當中所附有的超連結，附件或銀行帳戶資料。如有疑問，請尋求技術人員的支援。
+CAUTION: 
+The domain of email sender is first seen.  Beware of any
 hyperlink, attachment and bank account information unless you ensure the
 authenticity of the sender.  Seek IT assistance if in doubt.  
-注意：這是首次接收到的電郵地址。除非您確保其真確性，否則請留意當中所附有的超連結，附件或銀行帳戶資料。如有疑問，請尋求技術人員的支援。
 
 '''
 
-PREV_JUNK_BANNER_PLAIN = '''Warning: The domain of email sender was reported as a junk sender.  Beware of any
+PREV_JUNK_BANNER_PLAIN = '''警告：
+這是曾被舉報為垃圾發件人的電郵地址。除非您確保其真確性，否則請留意當中所附有的超連結，附件或銀行帳戶資料。如有疑問，請尋求技術人員的支援。
+WARNING: 
+The domain of email sender was reported as a junk sender.  Beware of any
 hyperlink, attachment and bank account information unless you ensure the
 authenticity of the sender.  Seek IT assistance if in doubt.  
-警告：這是曾被舉報為垃圾發件人的電郵地址。除非您確保其真確性，否則請留意當中所附有的超連結，附件或銀行帳戶資料。如有疑問，請尋求技術人員的支援。
 
 '''
 ########
