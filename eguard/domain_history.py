@@ -133,7 +133,7 @@ def process_userdir(user_email, user_dir):
 
             # If the sender address of the message is in the junk sender list,
             # always add the junk warning banner.
-            if is_address_exists_in_junk_sender(address, conn, logger=logger):
+            if is_address_exists_in_junk_sender(address, conn):
                 '''
                 Remove previously added unknown subject and unknown banner, if exist.
                 '''
@@ -175,7 +175,7 @@ def process_userdir(user_email, user_dir):
                     remove_banner_from_body(filepath, is_junk=False)
     
                     # Insert the address to known sender
-                    insert_address_to_known_sender(user_email, address, conn, logger=logger)
+                    insert_address_to_known_sender(user_email, address, conn)
     
                 else:
                     # In order to allow the user to unrecognize mistakely recognized sender addresses,
@@ -199,12 +199,12 @@ def process_userdir(user_email, user_dir):
                         add_banner_to_body(filepath, is_junk=False)
     
                         # Delete the address from known sender
-                        delete_address_from_known_sender(user_email, address, conn, logger=logger)
+                        delete_address_from_known_sender(user_email, address, conn)
     
                     else:
                         # If message is unread, add a warning banner to the subject.
                         # Add banner to Subject if record does not exist in database
-                        if not is_address_exists_in_known_sender(user_email, address, conn, logger=logger) == True:
+                        if not is_address_exists_in_known_sender(user_email, address, conn) == True:
                             add_banner_to_subject(filepath)
     
                             # Add banner to body
@@ -247,7 +247,7 @@ def process_userdir(user_email, user_dir):
             address = find_address_from_message(filepath)
 
             # Insert the address to junk sender
-            insert_address_to_junk_sender(address, conn, logger=logger)
+            insert_address_to_junk_sender(address, conn)
 
 
             add_banner_to_subject(filepath, is_junk=True)
@@ -275,13 +275,7 @@ def main():
             logger.error(f'{e}')
             connect_db()
 
-        try:
-            conn.execute(f'SELECT count(*) FROM junk_sender')
-
-        except (sqlite3.OperationalError) as e:
-            logger.error(f'{e}')
-            logger.info(f'yoyoyoyo{USER_EMAILS}')
-            init_db(conn, USER_EMAILS, logger=logger)
+        init_db(conn, USER_EMAILS)
 
         try:
             for user_email, userdir in USER_EMAILS_TO_DIRS.items():

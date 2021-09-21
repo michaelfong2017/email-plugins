@@ -1,7 +1,7 @@
 import logging
 
 def create_logger(debug=False):
-    logger = logging.getLogger(__name__)
+    logger = logging.getLogger()
 
     if debug:
         logger.setLevel(logging.DEBUG)

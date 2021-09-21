@@ -1,6 +1,6 @@
     # Assume that all user mail directories are directly under MailDir.
     # Also assume that the user mail directories are named with user email names.
-    # If this is not the case, please uncomment the lines below and configure UserDirectories.
+    # If this is not the case, please uncomment the lines below and configure UserEmailsToDirectories.
 
     # Recording user emails is useful in creating a list of known sender
     # in the database for each of the users.
@@ -12,7 +12,7 @@
     #'user3@example.com' = '/mailu/mail/user3@example.com'
 
 [Path]
-# If UserDirectories is uncommented, MailDir will not be read.
+# If UserEmailsToDirectories is uncommented, MailDir will not be read.
 MailDir = '/mailu/mail/'
 
 # Define the INBOX directory path relative to each user directory. 

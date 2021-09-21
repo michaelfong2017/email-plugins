@@ -1,19 +1,31 @@
+import sqlite3
 import datetime
+import logging
+
+logger = logging.getLogger()
 
 # Init db
-def init_db(conn, USER_EMAILS, logger=None):
+def init_db(conn, USER_EMAILS):
     start_time = datetime.datetime.now()
 
     for user_email in USER_EMAILS:
+        try:
+            conn.execute(f'SELECT count(*) FROM {user_email}_known_sender')
+
+        except (sqlite3.OperationalError) as e:
+            conn.execute(
+                f"""CREATE TABLE IF NOT EXISTS '{user_email}_known_sender' (address TEXT PRIMARY KEY NOT NULL);"""
+            )
+            conn.commit()
+
+    try:
+        conn.execute(f'SELECT count(*) FROM junk_sender')
+
+    except (sqlite3.OperationalError) as e:
         conn.execute(
-            f"""CREATE TABLE IF NOT EXISTS '{user_email}_known_sender' (address TEXT PRIMARY KEY NOT NULL);"""
+            """CREATE TABLE IF NOT EXISTS junk_sender (address TEXT PRIMARY KEY NOT NULL);"""
         )
         conn.commit()
-
-    conn.execute(
-        """CREATE TABLE IF NOT EXISTS junk_sender (address TEXT PRIMARY KEY NOT NULL);"""
-    )
-    conn.commit()
     
     if logger is not None:
         logger.info(
@@ -22,7 +34,7 @@ def init_db(conn, USER_EMAILS, logger=None):
 
 
 # Insert the address to known sender
-def insert_address_to_known_sender(user_email, address, conn, logger=None):
+def insert_address_to_known_sender(user_email, address, conn):
     try:
         conn.execute(f"""INSERT INTO '{user_email}_known_sender' (address) VALUES ({address});""")
         conn.commit()
@@ -33,7 +45,7 @@ def insert_address_to_known_sender(user_email, address, conn, logger=None):
 
 
 # Delete the address from known sender
-def delete_address_from_known_sender(user_email, address, conn, logger=None):
+def delete_address_from_known_sender(user_email, address, conn):
     try:
         conn.execute(f"""DELETE FROM '{user_email}_known_sender' WHERE address = {address};""")
         conn.commit()
@@ -44,7 +56,7 @@ def delete_address_from_known_sender(user_email, address, conn, logger=None):
 
 
 # Find if address exists in known sender
-def is_address_exists_in_known_sender(user_email, address, conn, logger=None):
+def is_address_exists_in_known_sender(user_email, address, conn):
     try:
         cursor = conn.execute(
             f"""SELECT count(*) FROM '{user_email}_known_sender' WHERE address = {address};"""
@@ -64,7 +76,7 @@ def is_address_exists_in_known_sender(user_email, address, conn, logger=None):
 
 
 # Insert the address to junk sender
-def insert_address_to_junk_sender(address, conn, logger=None):
+def insert_address_to_junk_sender(address, conn):
     try:
         conn.execute(f"""INSERT INTO junk_sender (address) VALUES ({address});""")
         conn.commit()
@@ -75,7 +87,7 @@ def insert_address_to_junk_sender(address, conn, logger=None):
 
 
 # Delete the address from junk sender
-def delete_address_from_junk_sender(address, conn, logger=None):
+def delete_address_from_junk_sender(address, conn):
     try:
         conn.execute(f"""DELETE FROM junk_sender WHERE address = {address};""")
         conn.commit()
@@ -86,7 +98,7 @@ def delete_address_from_junk_sender(address, conn, logger=None):
 
 
 # Find if address exists in junk sender
-def is_address_exists_in_junk_sender(address, conn, logger=None):
+def is_address_exists_in_junk_sender(address, conn):
     try:
         cursor = conn.execute(
             f"""SELECT count(*) FROM junk_sender WHERE address = {address};"""
