@@ -42,8 +42,10 @@ try:
         MAIL_DIR = config['Path']['MailDir']
         USER_EMAILS_TO_DIRS = {f.name: f.path for f in os.scandir(MAIL_DIR) if f.is_dir()}
 
-    INBOX_DIR_FROM_USER_DIR = config['Path']['InboxDirFromUserDir']
-    JUNK_DIR_FROM_USER_DIR = config['Path']['JunkDirFromUserDir']
+    CUR_INBOX_DIR_FROM_USER_DIR = config['Path']['CurInboxDirFromUserDir']
+    NEW_INBOX_DIR_FROM_USER_DIR = config['Path']['NewInboxDirFromUserDir']
+    CUR_JUNK_DIR_FROM_USER_DIR = config['Path']['CurJunkDirFromUserDir']
+    NEW_JUNK_DIR_FROM_USER_DIR = config['Path']['NewJunkDirFromUserDir']
 
     USER_EMAILS = [user_email for user_email, _ in USER_EMAILS_TO_DIRS.items()]
     USER_DIRS = [userdir for _, userdir in USER_EMAILS_TO_DIRS.items()]
@@ -52,8 +54,10 @@ except KeyError as e:
     logger.error(f'{e}\nPlease check that the above key is properly defined in the configuration file.')
 
 logger.info(f'USER_EMAILS_TO_DIRS: {USER_EMAILS_TO_DIRS}')
-logger.info(f'INBOX_DIR_FROM_USER_DIR: {INBOX_DIR_FROM_USER_DIR}')
-logger.info(f'JUNK_DIR_FROM_USER_DIR: {JUNK_DIR_FROM_USER_DIR}')
+logger.info(f'CUR_INBOX_DIR_FROM_USER_DIR: {CUR_INBOX_DIR_FROM_USER_DIR}')
+logger.info(f'NEW_INBOX_DIR_FROM_USER_DIR: {NEW_INBOX_DIR_FROM_USER_DIR}')
+logger.info(f'CUR_JUNK_DIR_FROM_USER_DIR: {CUR_JUNK_DIR_FROM_USER_DIR}')
+logger.info(f'NEW_JUNK_DIR_FROM_USER_DIR: {NEW_JUNK_DIR_FROM_USER_DIR}')
 
 
 # Construct a check set that stores a set of checked mails in a mailbox
@@ -65,7 +69,7 @@ logger.info(f'JUNK_DIR_FROM_USER_DIR: {JUNK_DIR_FROM_USER_DIR}')
 userdir_to_maildir_to_setname_to_set = {}
 for userdir in USER_DIRS:
     userdir_to_maildir_to_setname_to_set[userdir] = {}
-    for maildir in [INBOX_DIR_FROM_USER_DIR, JUNK_DIR_FROM_USER_DIR]:
+    for maildir in [CUR_INBOX_DIR_FROM_USER_DIR, CUR_JUNK_DIR_FROM_USER_DIR]:
         userdir_to_maildir_to_setname_to_set[userdir][maildir] = {}
         for setname in ['checked']:
             userdir_to_maildir_to_setname_to_set[userdir][maildir][setname] = set()
@@ -90,8 +94,10 @@ def connect_db():
 def process_userdir(user_email, user_dir):
     start_time = datetime.datetime.now()
 
-    INBOX_DIR = os.path.join(user_dir, INBOX_DIR_FROM_USER_DIR)
-    JUNK_DIR = os.path.join(user_dir, JUNK_DIR_FROM_USER_DIR)
+    INBOX_DIR = os.path.join(user_dir, CUR_INBOX_DIR_FROM_USER_DIR)
+    NEW_INBOX_DIR = os.path.join(user_dir, NEW_INBOX_DIR_FROM_USER_DIR)
+    JUNK_DIR = os.path.join(user_dir, CUR_JUNK_DIR_FROM_USER_DIR)
+    NEW_JUNK_DIR = os.path.join(user_dir, NEW_JUNK_DIR_FROM_USER_DIR)
 
     '''
     INBOX_DIR
@@ -102,7 +108,7 @@ def process_userdir(user_email, user_dir):
 
     '''Avoid redundant check'''
     # The set of mails that are previously checked.
-    inbox_checked = userdir_to_maildir_to_setname_to_set[user_dir][INBOX_DIR_FROM_USER_DIR]['checked'] 
+    inbox_checked = userdir_to_maildir_to_setname_to_set[user_dir][CUR_INBOX_DIR_FROM_USER_DIR]['checked'] 
 
     # The set of mails that are previously checked but do not exist in the current mail directory.
     # This means that these mails have been altered, usually the flags are altered.
@@ -111,8 +117,8 @@ def process_userdir(user_email, user_dir):
     # The set of checked mails must be updated so that these mails exist in the current step.
     # Otherwise, after some user actions and if the mails have the same name again in the future,
     # these mails will not be checked and there will be bugs.
-    userdir_to_maildir_to_setname_to_set[user_dir][INBOX_DIR_FROM_USER_DIR]['checked'] = inbox_all.intersection(userdir_to_maildir_to_setname_to_set[user_dir][INBOX_DIR_FROM_USER_DIR]['checked'])
-    inbox_checked = userdir_to_maildir_to_setname_to_set[user_dir][INBOX_DIR_FROM_USER_DIR]['checked'] 
+    userdir_to_maildir_to_setname_to_set[user_dir][CUR_INBOX_DIR_FROM_USER_DIR]['checked'] = inbox_all.intersection(userdir_to_maildir_to_setname_to_set[user_dir][CUR_INBOX_DIR_FROM_USER_DIR]['checked'])
+    inbox_checked = userdir_to_maildir_to_setname_to_set[user_dir][CUR_INBOX_DIR_FROM_USER_DIR]['checked'] 
 
     # The set of mails that are not checked previously and are about to be checked.
     inbox_unchecked = inbox_all.difference(inbox_checked)
@@ -154,7 +160,7 @@ def process_userdir(user_email, user_dir):
 
                 # Mark the mail as checked for the junk dir instead of
                 # the inbox dir since the mail has been moved.
-                userdir_to_maildir_to_setname_to_set[user_dir][JUNK_DIR_FROM_USER_DIR]['checked'].add(new_filename)
+                userdir_to_maildir_to_setname_to_set[user_dir][CUR_JUNK_DIR_FROM_USER_DIR]['checked'].add(new_filename)
 
             # If the sender address is not in the junk list, handle different cases.
             else:
@@ -176,6 +182,12 @@ def process_userdir(user_email, user_dir):
     
                     # Insert the address to known sender
                     insert_address_to_known_sender(user_email, address, conn)
+
+
+                    # Rename file based on size
+                    new_filename = rename_file_based_on_size(INBOX_DIR, inbox_mail)
+
+                    userdir_to_maildir_to_setname_to_set[user_dir][CUR_INBOX_DIR_FROM_USER_DIR]['checked'].add(new_filename)
     
                 else:
                     # In order to allow the user to unrecognize mistakely recognized sender addresses,
@@ -200,6 +212,15 @@ def process_userdir(user_email, user_dir):
     
                         # Delete the address from known sender
                         delete_address_from_known_sender(user_email, address, conn)
+
+
+                        # Rename file based on size
+                        new_filename = rename_file_based_on_size(INBOX_DIR, inbox_mail)
+
+                        # Move to `new` folder from `cur` folder
+                        move_to_new_inbox_folder(INBOX_DIR, NEW_INBOX_DIR, new_filename)
+
+                        userdir_to_maildir_to_setname_to_set[user_dir][CUR_INBOX_DIR_FROM_USER_DIR]['checked'].add(new_filename)
     
                     else:
                         # If message is unread, add a warning banner to the subject.
@@ -213,15 +234,97 @@ def process_userdir(user_email, user_dir):
                             pass
                         
                         
-                # Rename file based on size
-                new_filename = rename_file_based_on_size(INBOX_DIR, inbox_mail)
+                        # Rename file based on size
+                        new_filename = rename_file_based_on_size(INBOX_DIR, inbox_mail)
 
-                userdir_to_maildir_to_setname_to_set[user_dir][INBOX_DIR_FROM_USER_DIR]['checked'].add(new_filename)
+                        userdir_to_maildir_to_setname_to_set[user_dir][CUR_INBOX_DIR_FROM_USER_DIR]['checked'].add(new_filename)
 
 
         except FileNotFoundError as e:
             logger.error(f'{e}')
 
+    '''
+    NEW_INBOX_DIR
+    '''
+    new_inbox_all = set([f.name for f in os.scandir(NEW_INBOX_DIR)])
+    for new_inbox_mail in new_inbox_all:
+        try:
+            logger.info(f"Checking email {new_inbox_mail}")
+
+            filepath = os.path.join(NEW_INBOX_DIR, new_inbox_mail)
+
+            flags = new_inbox_mail.split(',')[-1]
+
+            # Find address from the message
+            address = find_address_from_message(filepath)
+
+            # If the sender address of the message is in the junk sender list,
+            # always add the junk warning banner.
+            if is_address_exists_in_junk_sender(address, conn):
+                '''
+                Remove previously added unknown subject and unknown banner, if exist.
+                '''
+                remove_banner_from_subject(filepath, is_junk=False)
+
+                remove_banner_from_body(filepath, is_junk=False)
+                ''''''
+
+                add_banner_to_subject(filepath, is_junk=True)
+
+                add_banner_to_body(filepath, is_junk=True)
+
+                # Rename file based on size
+                new_filename = rename_file_based_on_size(NEW_INBOX_DIR, new_inbox_mail)
+
+                # Move junk mail to junk folder
+                move_to_junk_folder(NEW_INBOX_DIR, JUNK_DIR, new_filename)
+
+
+            # If the sender address is not in the junk list, handle different cases.
+            else:
+                '''
+                Remove previously added junk subject and junk banner, if exist.
+                '''
+                remove_banner_from_subject(filepath, is_junk=True)
+
+                remove_banner_from_body(filepath, is_junk=True)
+                ''''''
+
+                # If message is read, mark as recognized in database.
+                if ('S' in flags):
+                    # Remove banner from Subject if exists
+                    remove_banner_from_subject(filepath)
+    
+                    # Remove the previously prepended warning banner from mail body (have to handle for both plain and html)
+                    remove_banner_from_body(filepath, is_junk=False)
+    
+                    # Insert the address to known sender
+                    insert_address_to_known_sender(user_email, address, conn)
+
+
+                    # Rename file based on size
+                    new_filename = rename_file_based_on_size(NEW_INBOX_DIR, new_inbox_mail)
+
+                    # userdir_to_maildir_to_setname_to_set[user_dir][CUR_INBOX_DIR_FROM_USER_DIR]['checked'].add(new_filename)
+    
+                else:
+                    # If message is unread, add a warning banner to the subject.
+                    # Add banner to Subject if record does not exist in database
+                    if not is_address_exists_in_known_sender(user_email, address, conn) == True:
+                        add_banner_to_subject(filepath)
+
+                        # Add banner to body
+                        add_banner_to_body(filepath, is_junk=False)
+                    else:
+                        pass
+                    
+                    
+                    # Rename file based on size
+                    new_filename = rename_file_based_on_size(NEW_INBOX_DIR, new_inbox_mail)
+
+
+        except FileNotFoundError as e:
+            logger.error(f'{e}')
 
     '''
     JUNK_DIR
@@ -231,8 +334,8 @@ def process_userdir(user_email, user_dir):
     junk_all = set([f.name for f in os.scandir(JUNK_DIR)])
 
     # Avoid redundant check
-    userdir_to_maildir_to_setname_to_set[user_dir][JUNK_DIR_FROM_USER_DIR]['checked'] = junk_all.intersection(userdir_to_maildir_to_setname_to_set[user_dir][JUNK_DIR_FROM_USER_DIR]['checked'])
-    junk_checked = userdir_to_maildir_to_setname_to_set[user_dir][JUNK_DIR_FROM_USER_DIR]['checked'] 
+    userdir_to_maildir_to_setname_to_set[user_dir][CUR_JUNK_DIR_FROM_USER_DIR]['checked'] = junk_all.intersection(userdir_to_maildir_to_setname_to_set[user_dir][CUR_JUNK_DIR_FROM_USER_DIR]['checked'])
+    junk_checked = userdir_to_maildir_to_setname_to_set[user_dir][CUR_JUNK_DIR_FROM_USER_DIR]['checked'] 
     junk_unchecked = junk_all.difference(junk_checked)
 
     logger.info(f'junk_unchecked length: {len(junk_unchecked)}')
@@ -258,7 +361,7 @@ def process_userdir(user_email, user_dir):
             # Rename file based on size
             new_filename = rename_file_based_on_size(JUNK_DIR, junk_mail)
 
-            userdir_to_maildir_to_setname_to_set[user_dir][JUNK_DIR_FROM_USER_DIR]['checked'].add(new_filename)
+            userdir_to_maildir_to_setname_to_set[user_dir][CUR_JUNK_DIR_FROM_USER_DIR]['checked'].add(new_filename)
 
         except FileNotFoundError as e:
             logger.error(f'{e}')

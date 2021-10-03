@@ -193,7 +193,10 @@ def rename_file_based_on_size(MAIL_DIR, filename):
     os.rename(filepath, os.path.join(MAIL_DIR, new_filename))
 
     return new_filename
-    
+
+# Move mail to `new` inbox folder
+def move_to_new_inbox_folder(CUR_INBOX_DIR, NEW_INBOX_DIR, filename):
+    shutil.move(os.path.join(CUR_INBOX_DIR, filename), os.path.join(NEW_INBOX_DIR, filename))    
 
 # Move junk mail to junk folder
 def move_to_junk_folder(INBOX_DIR, JUNK_DIR, filename):

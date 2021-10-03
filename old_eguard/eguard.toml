@@ -17,8 +17,10 @@ MailDir = '/mailu/mail/'
 
 # Define the INBOX directory path relative to each user directory. 
 # Assume that this relative path is consistent in all user directories.
-InboxDirFromUserDir = 'cur'
+CurInboxDirFromUserDir = 'cur'
+NewInboxDirFromUserDir = 'new'
 
 # Define the junk directory path relative to each user directory. 
 # Assume that this relative path is consistent in all user directories.
-JunkDirFromUserDir = '.Junk/cur'
+CurJunkDirFromUserDir = '.Junk/cur'
+NewJunkDirFromUserDir = '.Junk/new'

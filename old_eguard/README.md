@@ -15,17 +15,6 @@ sudo apt update && sudo apt install python3-pip python3-venv -y
 ```
 <br>
 
-### tmux command installed
-For Ubuntu and Debian,
-```
-sudo apt install tmux
-```
-
-For CentOS,
-```
-sudo yum install tmux
-```
-
 ### Access right to all user directories for the current user
 
 ---
