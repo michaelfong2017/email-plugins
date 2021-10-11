@@ -3,6 +3,8 @@
 #### 1 hashtag is used for configuration and 4 or more hashtags are used for comment.
 ################
 
+domain: "michaelfong.co"
+
 log:
   output: "output.log"
 

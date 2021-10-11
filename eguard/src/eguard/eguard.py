@@ -1,9 +1,16 @@
 import typer
 from .util.logger import create_logger
-from .event.maildir import MaildirEventHandler
+from .containers import Container
 from watchdog.observers import Observer
 import time
-import yaml
+
+#### Dependency injector: import modules to be wired with the container.
+from .event import maildir
+from .models import user_model
+
+#### END ####
+
+from .models.user_model import User
 
 
 def main(
@@ -40,16 +47,22 @@ def main(
     # Logger
     logger = create_logger(debug=debug)
 
-    # Read config file
-    config_file_merged = "config/eguard-merged.yml"
-    with open(config_file_merged, "r") as f:
-        config = yaml.safe_load(f)
-    logger.info(config)
+    container = Container()
+    # container.wire should be called here. Calling it inside Container class does not work.
+    container.wire(modules=[maildir, user_model])
 
-    path = "src/eguard"
-    event_handler = MaildirEventHandler()
     observer = Observer()
-    observer.schedule(event_handler, path, recursive=True)
+    for user_dir in container.user_dirs():
+        user = container.user_factory(user_dir)
+        event_handler = container.cur_inbox_event_handler_factory(user)
+        observer.schedule(event_handler, user.cur_inbox_dir, recursive=True)
+        event_handler = container.new_inbox_event_handler_factory(user)
+        observer.schedule(event_handler, user.new_inbox_dir, recursive=True)
+        event_handler = container.cur_junk_event_handler_factory(user)
+        observer.schedule(event_handler, user.cur_junk_dir, recursive=True)
+        event_handler = container.new_junk_event_handler_factory(user)
+        observer.schedule(event_handler, user.new_junk_dir, recursive=True)
+
     observer.start()
     try:
         while True:
