@@ -5,9 +5,6 @@
 
 domain: "michaelfong.co"
 
-log:
-  output: "output.log"
-
 #### Recording user emails is useful in creating a list of known sender
 #### in the database for each of the users.
 

@@ -1,16 +1,9 @@
-from dataclasses import dataclass
 import sqlite3
 import os
 import datetime
 import logging
 
 logger = logging.getLogger()
-
-
-@dataclass
-class Sender:
-    email: str
-    # date_added: str  # Use datetime in sqlite
 
 
 class SqliteSenderRepository:
@@ -41,12 +34,12 @@ class SqliteSenderRepository:
         self.connect_db_if_not()
 
         try:
-            self.conn.execute(f"SELECT count(*) FROM '{user_email}_known_sender'")
+            self.conn.execute(f"""SELECT count(*) FROM `{user_email}_known_sender`""")
 
         except (sqlite3.OperationalError) as e:
-            logger.info(f"{self}: create table '{user_email}_known_sender' now.")
+            logger.info(f"{self}: create table `{user_email}_known_sender` now.")
             self.conn.execute(
-                f"""CREATE TABLE IF NOT EXISTS '{user_email}_known_sender' (address TEXT PRIMARY KEY NOT NULL);"""
+                f"""CREATE TABLE IF NOT EXISTS `{user_email}_known_sender` (address TEXT PRIMARY KEY NOT NULL)"""
             )
             self.conn.commit()
 
@@ -54,48 +47,48 @@ class SqliteSenderRepository:
         self.connect_db_if_not()
 
         try:
-            self.conn.execute(f"SELECT count(*) FROM junk_sender")
+            self.conn.execute(f"""SELECT count(*) FROM junk_sender""")
 
         except (sqlite3.OperationalError) as e:
             logger.info(f"{self}: create table junk_sender now.")
             self.conn.execute(
-                """CREATE TABLE IF NOT EXISTS junk_sender (address TEXT PRIMARY KEY NOT NULL);"""
+                """CREATE TABLE IF NOT EXISTS junk_sender (address TEXT PRIMARY KEY NOT NULL)"""
             )
             self.conn.commit()
 
     # Insert the address to known sender
     def insert_address_to_known_sender(self, user_email, address):
-        self.create_known_sender_table_if_not_exists()
+        self.create_known_sender_table_if_not_exists(user_email)
 
         try:
             self.conn.execute(
-                f"""INSERT INTO '{user_email}_known_sender' (address) VALUES ('{address}');"""
+                f"""INSERT INTO `{user_email}_known_sender` (address) VALUES ({address})"""
             )
             self.conn.commit()
         except Exception as e:
-            logger.error(f"{e} in SET KNOWN operation for address '{address}'")
+            logger.error(f"{e} in SET KNOWN operation for address {address}")
             self.conn.rollback()
 
     # Delete the address from known sender
     def delete_address_from_known_sender(self, user_email, address):
-        self.create_known_sender_table_if_not_exists()
+        self.create_known_sender_table_if_not_exists(user_email)
 
         try:
             self.conn.execute(
-                f"""DELETE FROM '{user_email}_known_sender' WHERE address = '{address}';"""
+                f"""DELETE FROM `{user_email}_known_sender` WHERE address = {address}"""
             )
             self.conn.commit()
         except Exception as e:
-            logger.error(f"{e} in UNSET KNOWN operation for address '{address}'")
+            logger.error(f"{e} in UNSET KNOWN operation for address {address}")
             self.conn.rollback()
 
     # Find if address exists in known sender
     def is_address_exists_in_known_sender(self, user_email, address):
-        self.create_known_sender_table_if_not_exists()
+        self.create_known_sender_table_if_not_exists(user_email)
 
         try:
             cursor = self.conn.execute(
-                f"""SELECT count(*) FROM '{user_email}_known_sender' WHERE address = '{address}';"""
+                f"""SELECT count(*) FROM `{user_email}_known_sender` WHERE address = {address}"""
             )
             records = cursor.fetchall()
             match_count = records[0][0]
@@ -106,7 +99,7 @@ class SqliteSenderRepository:
                 return True
 
         except Exception as e:
-            logger.error(f"{e} in CHECK KNOWN operation for address '{address}'")
+            logger.error(f"{e} in CHECK KNOWN operation for address {address}")
             return None
 
     # Insert the address to junk sender
@@ -115,11 +108,11 @@ class SqliteSenderRepository:
 
         try:
             self.conn.execute(
-                f"""INSERT INTO junk_sender (address) VALUES ('{address}');"""
+                f"""INSERT INTO junk_sender (address) VALUES ({address})"""
             )
             self.conn.commit()
         except Exception as e:
-            logger.error(f"{e} in SET JUNK operation for address '{address}'")
+            logger.error(f"{e} in SET JUNK operation for address {address}")
             self.conn.rollback()
 
     # Delete the address from junk sender
@@ -127,10 +120,12 @@ class SqliteSenderRepository:
         self.create_junk_sender_table_if_not_exists()
 
         try:
-            self.conn.execute(f"""DELETE FROM junk_sender WHERE address = '{address}';""")
+            self.conn.execute(
+                f"""DELETE FROM junk_sender WHERE address = {address}"""
+            )
             self.conn.commit()
         except Exception as e:
-            logger.error(f"{e} in UNSET JUNK operation for address '{address}'")
+            logger.error(f"{e} in UNSET JUNK operation for address {address}")
             self.conn.rollback()
 
     # Find if address exists in junk sender
@@ -139,7 +134,7 @@ class SqliteSenderRepository:
 
         try:
             cursor = self.conn.execute(
-                f"""SELECT count(*) FROM junk_sender WHERE address = '{address}';"""
+                f"""SELECT count(*) FROM junk_sender WHERE address = {address}"""
             )
             records = cursor.fetchall()
             match_count = records[0][0]
@@ -150,5 +145,5 @@ class SqliteSenderRepository:
                 return True
 
         except Exception as e:
-            logger.error(f"{e} in CHECK JUNK operation for address '{address}'")
+            logger.error(f"{e} in CHECK JUNK operation for address {address}")
             return None

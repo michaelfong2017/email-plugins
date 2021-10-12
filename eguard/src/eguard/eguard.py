@@ -35,7 +35,13 @@ def main(
         False,
         "--debug",
         "-d",
-        help="Debug level set from logging.ERROR to logging.DEBUG",
+        help="Debug level set from logging.ERROR to logging.DEBUG.",
+    ),
+    monitor_user_dir: bool = typer.Option(
+        False,
+        "--monitor-user-dir",
+        "-m",
+        help="Monitor file system events of each user mail directory.",
     ),
 ):
     """
@@ -61,8 +67,10 @@ def main(
         observer.schedule(event_handler, user.cur_junk_dir, recursive=True)
         event_handler = container.new_junk_event_handler_factory(user)
         observer.schedule(event_handler, user.new_junk_dir, recursive=True)
-        event_handler = container.user_dir_event_handler_factory(user)
-        observer.schedule(event_handler, "src/eguard", recursive=True)
+        
+        if monitor_user_dir:
+            event_handler = container.user_dir_event_handler_factory(user)
+            observer.schedule(event_handler, user_dir, recursive=False)
 
     observer.start()
     try:

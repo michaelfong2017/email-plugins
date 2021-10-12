@@ -3,8 +3,6 @@
 #### 1 hashtag is used for configuration and 4 or more hashtags are used for comment.
 ################
 domain: "michaelfong.co"
-log:
-  output: "output.log"
 #### Recording user emails is useful in creating a list of known sender
 #### in the database for each of the users.
 
