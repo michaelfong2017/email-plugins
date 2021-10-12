@@ -1,7 +1,14 @@
 from dependency_injector import containers, providers
 import os
+
+import sqlite3
 from .event import maildir
 from .models.user_model import UserFactory
+from .models.sender_model import SqliteSenderRepository
+
+import logging
+
+logger = logging.getLogger()
 
 
 class Container(containers.DeclarativeContainer):
@@ -35,4 +42,16 @@ class Container(containers.DeclarativeContainer):
     new_junk_event_handler_factory = providers.Factory(
         maildir.NewJunkEventHandler,
     )
+    #### END ####
+
+    #### Database ####
+    sender_repository = providers.Factory(
+        SqliteSenderRepository,
+    )
+
+    user_dir_event_handler_factory = providers.Factory(
+        maildir.UserDirEventHandler,
+        sender_repository=sender_repository,
+    )
+
     #### END ####

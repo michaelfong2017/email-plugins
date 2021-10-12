@@ -10,8 +10,6 @@ from .models import user_model
 
 #### END ####
 
-from .models.user_model import User
-
 
 def main(
     command: str = typer.Argument(
@@ -47,6 +45,7 @@ def main(
     # Logger
     logger = create_logger(debug=debug)
 
+    # Dependency injector
     container = Container()
     # container.wire should be called here. Calling it inside Container class does not work.
     container.wire(modules=[maildir, user_model])
@@ -62,6 +61,8 @@ def main(
         observer.schedule(event_handler, user.cur_junk_dir, recursive=True)
         event_handler = container.new_junk_event_handler_factory(user)
         observer.schedule(event_handler, user.new_junk_dir, recursive=True)
+        event_handler = container.user_dir_event_handler_factory(user)
+        observer.schedule(event_handler, "src/eguard", recursive=True)
 
     observer.start()
     try:
