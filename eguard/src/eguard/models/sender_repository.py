@@ -66,7 +66,6 @@ class SqliteSenderRepository:
             )
             self.conn.commit()
         except Exception as e:
-            logger.error(f"{e} in SET KNOWN operation for address {address}")
             self.conn.rollback()
 
     # Delete the address from known sender
@@ -79,7 +78,6 @@ class SqliteSenderRepository:
             )
             self.conn.commit()
         except Exception as e:
-            logger.error(f"{e} in UNSET KNOWN operation for address {address}")
             self.conn.rollback()
 
     # Find if address exists in known sender
@@ -112,7 +110,6 @@ class SqliteSenderRepository:
             )
             self.conn.commit()
         except Exception as e:
-            logger.error(f"{e} in SET JUNK operation for address {address}")
             self.conn.rollback()
 
     # Delete the address from junk sender
@@ -125,7 +122,6 @@ class SqliteSenderRepository:
             )
             self.conn.commit()
         except Exception as e:
-            logger.error(f"{e} in UNSET JUNK operation for address {address}")
             self.conn.rollback()
 
     # Find if address exists in junk sender

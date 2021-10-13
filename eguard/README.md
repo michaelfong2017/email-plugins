@@ -120,3 +120,42 @@ python3 main.py -h
 ```bash
 ps aux | grep src.eguard
 ```
+
+### Options
+Options:
+  -d, --debug                     Debug level set from logging.ERROR to
+                                  logging.DEBUG.
+  -m, --monitor-user-dir          Monitor file system events of each user mail
+                                  directory.
+
+- For development, the command is usually:
+```bash
+python3 main.py restart --debug
+```
+
+## View the tmux session inside which eguard is run
+Eguard is designed to run inside a tmux session which is automatically created.
+Sometimes it can be convenient to attach to it and inspect.
+
+To list all tmux sessions in the host machine:
+```bash
+tmux list-sessions
+```
+- A tmux session named 'eguard' should be found if eguard is run correctly.
+
+To attach to a tmux session:
+
+implicitly,
+```bash
+tmux attach
+```
+
+or
+
+explicitly,
+```bash
+tmux attach -t eguard
+```
+
+To detach from a tmux session:
+Press Ctrl + B (for mac: ^ + B), release both keys and then press D.
