@@ -85,7 +85,7 @@ bash install.sh
 <br>
 
 ## Configuration
-1. Configure `eguard.yml`. Don't manually edit `eguard-default.yml` and the `eguard-merged.yml` generated in the next step.
+1. Configure `eguard.yml`. Don't manually edit `eguard-default.yml` and the `eguard-merged.yml`, which are to be generated in the next step.
 
 2. Start/Restart eguard every time `eguard.yml` has changed due to user configuration or `eguard-default.yml` has changed due to a software update, in order to generate `eguard-merged.yml` which is the only configuration file to be processed.
 
