@@ -85,6 +85,28 @@ bash install.sh
 <br>
 
 ## Configuration
+Admin should configure only the file `eguard.yml` by reading `eguard-default.yml`
+and figuring out what configurations should be overriden by `eguard.yml`.
+
+### Configure paths
+Essentially, configurations under the first level key `path` have to be configured
+because the paths to different mail directories and even mailbox structure vary
+from mail server to mail server. 
+
+Use
+```
+tree -a <dir>
+``` 
+command to examine the directory structure of the machine and find the correct paths.
+
+
+If paths are incorrectly configured, FileNotFoundError can be raised.
+
+---
+
+Beware of software update (if any) that changes `eguard-default.yml`. User configurations
+may have to be rechecked.
+
 1. Configure `eguard.yml`. Don't manually edit `eguard-default.yml` and the `eguard-merged.yml`, which are to be generated in the next step.
 
 2. Start/Restart eguard every time `eguard.yml` has changed due to user configuration or `eguard-default.yml` has changed due to a software update, in order to generate `eguard-merged.yml` which is the only configuration file to be processed.
@@ -162,3 +184,15 @@ tmux attach -t eguard
 
 To detach from a tmux session:
 Press Ctrl + B (for mac: ^ + B), release both keys and then press D.
+
+## Working with eguard database
+Admin should connect to eguard.db inside this directory to create, read, update and delete
+records of known sender emails and junk sender emails.
+
+For the working environment, VSCode together with VSCode extension `Remote - SSH` and VSCode extension `SQLite` is highly recommended.
+
+example.sql contains examples of common database tasks that admin has to accomplish.
+
+## Log
+This directory contains three log files that record logs in different logging level.
+Pass the --debug/-d flag to main.py to enable full logging.
