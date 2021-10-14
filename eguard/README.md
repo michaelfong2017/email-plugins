@@ -92,6 +92,9 @@ bash install.sh
 <br>
 
 ## Run eguard
+- When new user email is registered or a user mail directory is removed, eguard has to be restarted. Reconfiguration of user
+directory paths before restart may be needed.
+
 ### Start eguard
 ```bash
 python3 main.py start
