@@ -238,8 +238,8 @@ class NewInboxEventHandler(FileSystemEventHandler):
                     # Add banner to body
                     add_banner_to_body(filepath, is_junk=False)
 
-                    # Rename new mail based on size
-                    rename_new_mail_based_on_size(self.user.new_inbox_dir, filename)
+                # Rename new mail based on size
+                rename_new_mail_based_on_size(self.user.new_inbox_dir, filename)
 
         return super().on_any_event(event)
 

@@ -21,7 +21,7 @@ class UserFactory:
     new_junk_dir_from_user_dir = Provide["config.path.new_junk_dir_from_user_dir"]
 
     def create_user(self, user_dir: str):
-        email = ntpath.basename(user_dir)
+        email = ntpath.basename(user_dir.rstrip("/"))
         if "@" not in email:
             email += "@" + self.domain
         return User(
