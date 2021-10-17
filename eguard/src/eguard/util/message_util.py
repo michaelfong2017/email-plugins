@@ -309,8 +309,10 @@ def remove_banner_from_body(filepath, is_junk=False):
 
             # Create the body of the message from the original msg (a plain-text and an HTML version).
             body_plain, body_html, _ = find_body_plain_and_html_from_message(msg)
-            body_plain = body_plain.decode("utf-8")
-            body_html = body_html.decode("utf-8")
+            if type(body_plain) == bytes:
+                body_plain = body_plain.decode("utf-8")
+            if type(body_html) == bytes:
+                body_html = body_html.decode("utf-8")
 
             # The lines below remove existing banner(s) first.
             #### BEGIN remove ####
@@ -392,8 +394,10 @@ def add_banner_to_body(filepath, is_junk=False):
 
             # If not multipart, for example, plain text only.
             if is_multipart:
-                body_plain = body_plain.decode("utf-8")
-                body_html = body_html.decode("utf-8")
+                if type(body_plain) == bytes:
+                    body_plain = body_plain.decode("utf-8")
+                if type(body_html) == bytes:
+                    body_html = body_html.decode("utf-8")
 
                 # The lines below remove existing banner(s) first.
                 #### BEGIN remove ####
