@@ -14,6 +14,7 @@ from ..models.user_model import User
 from ..models.sender_repository import *
 from ..util.message_util import *
 import ntpath
+import threading
 
 logger = logging.getLogger()
 
@@ -113,25 +114,37 @@ class CurInboxEventHandler(FileSystemEventHandler):
             )
 
         else:
-            """
-            Remove all previously added banner(s), if exists.
-            """
-            remove_all_banners(filepath)
-            """"""
-
             # If message is read ('S' for 'seen'), mark as recognized in database.
             if "S" in flags:
-                # Insert the address to known sender
-                self.sender_repository.insert_address_to_known_sender(
-                    self.user.email, address
-                )
+                def recognize_later():
+                    if os.path.exists(filepath):
+                        """
+                        Remove all previously added banner(s), if exists.
+                        """
+                        remove_all_banners(filepath)
+                        """"""
+                        # Insert the address to known sender
+                        self.sender_repository.insert_address_to_known_sender(
+                            self.user.email, address
+                        )
 
-                # Rename file based on size
-                rename_file_based_on_size(self.user.cur_inbox_dir, filename)
+                        # Rename file based on size
+                        rename_file_based_on_size(self.user.cur_inbox_dir, filename)
 
+                t = threading.Timer(10.0, recognize_later)
+                # I tested that the thread will no longer be running after the scheduled
+                # function is run.
+                t.start()
+            
             # If the user now marks these mails as unseen from seen, these mails' sender addresses
             # will be changed from recognized to unrecognized.
             else:
+                """
+                Remove all previously added banner(s), if exists.
+                """
+                remove_all_banners(filepath)
+                """"""
+
                 # Add banner to Subject
                 add_banner_to_subject(filepath, is_junk=False)
 

@@ -19,14 +19,16 @@ class SqliteSenderRepository:
                 del self.conn
                 logger.info(f"{self}: connect db now.")
                 self.conn = sqlite3.connect(
-                    os.path.join(os.path.abspath("."), "data/eguard.db")
+                    os.path.join(os.path.abspath("."), "data/eguard.db"),
+                    check_same_thread=False
                 )
                 self.conn_time = datetime.datetime.now()
 
         except (AttributeError) as e:
             logger.info(f"{self}: connect db now.")
             self.conn = sqlite3.connect(
-                os.path.join(os.path.abspath("."), "data/eguard.db")
+                os.path.join(os.path.abspath("."), "data/eguard.db"),
+                check_same_thread=False
             )
             self.conn_time = datetime.datetime.now()
 
