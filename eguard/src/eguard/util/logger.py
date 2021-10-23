@@ -70,8 +70,8 @@ def timing(f):
         outer_frameinfo = inspect.getouterframes(inspect.currentframe())[1]
         logger.info(
             f"""Time elapsed for executing the below function is {duration}.
-File "{f_file}", line {f_first_lineno}, {f.__name__} in
-File "{outer_frameinfo.filename}", line {outer_frameinfo.lineno}, {outer_frameinfo.function}"""
+File "{f_file}", {f.__name__}:{f_first_lineno} in
+File "{outer_frameinfo.filename}", {outer_frameinfo.function}:{outer_frameinfo.lineno}"""
         )
         return result
 
