@@ -414,7 +414,7 @@ def add_banner_to_body(filepath, is_junk=False):
                 # That's the case subject has been updated and migration is required.
                 elif re.search(f"{PREV_BANNER_HTML}", body_html):
                     body_html = re.sub(PREV_BANNER_HTML, "", body_html)
-                #### END remove ####
+                #### END remove #### 
 
                 html = f"""{BANNER_HTML}{body_html}"""
             else:
@@ -443,8 +443,139 @@ Remove all subject and body banners before demanding a banner.
 Logically, for a mail, multiple banners in arbitrary positions are removed
 at once.
 """
+
+
 def remove_all_banners(filepath):
     remove_banner_from_subject(filepath, is_junk=True)
     remove_banner_from_body(filepath, is_junk=True)
     remove_banner_from_subject(filepath, is_junk=False)
     remove_banner_from_body(filepath, is_junk=False)
+
+
+# %%
+# import email
+
+
+# def test():
+#     filepath = "/mailu/mail/cs@michaelfong.co/cur/1636096665.M141405P6455.f9db57f63506,S=975,W=1000:2,S"
+#     filepath2 = "/mailu/mail/cs@michaelfong.co/cur/1636096686.M399989P6455.f9db57f63506,S=847,W=868:2,S"
+#     filepath3 = "/mailu/mail/cs@michaelfong.co/cur/1636096711.M127784P6455.f9db57f63506,S=1579,W=1621:2,S"
+#     filepath4 = "/mailu/mail/cs@michaelfong.co/cur/1636096733.M54203P6455.f9db57f63506,S=1111,W=1139:2,S"
+#     filepath5 = "/mailu/mail/cs@michaelfong.co/cur/1636096842.M496581P6574.f9db57f63506,S=371083,W=375942:2,S"
+#     filepath6 = "/mailu/mail/cs@michaelfong.co/cur/1636096884.M878900P6574.f9db57f63506,S=370608,W=375450:2,S"
+#     filepath7 = "/mailu/mail/cs@michaelfong.co/cur/1636096954.M596759P6644.f9db57f63506,S=996569,W=1009544:2,S"
+#     filepath8 = "/mailu/mail/cs@michaelfong.co/cur/1636096982.M830818P6644.f9db57f63506,S=996420,W=1009390:2,S"
+#     filepath9 = "/mailu/mail/cs@michaelfong.co/cur/1636097029.M531700P6644.f9db57f63506,S=997175,W=1010168:2,S"
+#     filepath10 = "/mailu/mail/cs@michaelfong.co/cur/1636097060.M607977P6644.f9db57f63506,S=996705,W=1009684:2,S"
+#     filepath11 = "/mailu/mail/cs@michaelfong.co/cur/1636097114.M95706P6644.f9db57f63506,S=1366710,W=1384521:2,S"
+#     filepath12 = "/mailu/mail/cs@michaelfong.co/cur/1636097155.M42624P6644.f9db57f63506,S=1366202,W=1383995:2,S"
+#     try:
+#         for path in [
+#             filepath,
+#             filepath2,
+#             filepath3,
+#             filepath4,
+#             filepath5,
+#             filepath6,
+#             filepath7,
+#             filepath8,
+#             filepath9,
+#             filepath10,
+#             filepath11,
+#             filepath12,
+#         ]:
+#             with open(filepath3, "r+") as f:
+#                 # Get msg and headers from file for further processing
+#                 msg = email.message_from_file(
+#                     f
+#                 )  # Whole email message including both headers and content
+#                 parser = email.parser.HeaderParser()
+#                 headers = parser.parsestr(msg.as_string())
+
+#                 subject = headers["Subject"]
+#                 # print(subject)
+#                 # print("\n")
+
+#                 # print(headers["Content-Type"])
+#                 # print("\n")
+
+#                 for part in msg.walk():
+#                     ctype = part.get_content_type()
+#                     charset = part.get_content_charset()
+#                     cdispo = part.get_content_disposition()
+#                     print(f"ctype: {ctype}")
+#                     # print(f"charset: {charset}")
+#                     # print(f"cdispo: {cdispo}")
+#                     # print(part.get_payload()[:20] if len(part.get_payload()) > 20 else part.get_payload())
+#                     # if ctype == "multipart/mixed" or ctype == "multipart/alternative" or ctype == "multipart/related":
+#                     #     print(part.get_payload(decode=True))
+#                     # else:
+#                     #     print(part.get_payload(decode=True)[:20] if len(part.get_payload(decode=True)) > 20 else part.get_payload(decode=True))
+#                     if not ctype.startswith("multipart"):
+#                         print(part.get_payload(decode=True).decode("utf-8"))
+#                     print("\n")
+#                     # cdispo = str(part.get("Content-Disposition"))
+
+#                     # skip any text/plain (txt) attachments
+#                     # if ctype == "text/plain" and "attachment" not in cdispo:
+#                     #     body_plain = part.get_payload(decode=True)  # decode
+#                     # if ctype == "text/html" and "attachment" not in cdispo:
+#                     #     body_html = part.get_payload(decode=True)  # decode
+
+#                 # if subject:
+#                 #     if subject.startswith(SUBJECT):
+#                 #         pass
+#                 #     else:
+#                 #         # Start with subject of the previous version instead of the current version.
+#                 #         # That's the case subject has been updated and migration is required.
+#                 #         if subject.startswith(PREV_SUBJECT):
+#                 #             headers.replace_header(
+#                 #                 "Subject", subject.replace(PREV_SUBJECT, SUBJECT)
+#                 #             )
+#                 #         else:
+#                 #             headers.replace_header("Subject", SUBJECT + subject)
+#                 #         f.seek(0)
+#                 #         f.write(headers.as_string())
+#                 #         f.truncate()
+#                 # else:
+#                 #     headers.add_header("Subject", SUBJECT)
+#                 #     f.seek(0)
+#                 #     f.write(headers.as_string())
+#                 #     f.truncate()
+
+#     except Exception as e:
+#         pass
+
+
+# test()
+# # %%
+# import re
+# import quopri
+
+# BANNER = "[FROM NEW SENDER] "
+
+# subject = "=?UTF-8?Q?=E5=B0=B1=E5=92=81plain_text_test_email?="
+# regex = r"=\?UTF-8\?Q\?(.*?)\?="
+# match = re.match(regex, subject)
+
+# # (c) No subject
+# if subject is None:
+#     # ...
+#     pass
+
+# else:
+#     # (b) Has subject with chinese characters
+#     if match:
+#         content = match.groups()[0]
+#         decoded = quopri.decodestring(content, header=True).decode("utf-8")
+#         encoded = quopri.encodestring(
+#             (BANNER + decoded).encode("utf-8"), header=True
+#         ).decode("utf-8")
+#         new_subject = f"=?UTF-8?Q?{encoded}?="
+
+#     # (a) Has subject without chinese characters
+#     else:
+#         new_subject = f"{BANNER}{subject}"
+
+# print(new_subject)
+# %%
