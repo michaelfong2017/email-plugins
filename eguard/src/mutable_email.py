@@ -118,13 +118,16 @@ class MutableEmailFactory:
 class MutableEmail:
     default_html = """<html><head><meta http-equiv="Content-Type" content="text/html; charset=UTF-8" /></head><body style='font-size: 10pt; font-family: Verdana,Geneva,sans-serif'>
 
-</body></html>"""
+</body></html>
+"""
 
     def wrap_text_with_default_html(self, text):
         return f"""<html><head><meta http-equiv="Content-Type" content="text/html; charset=UTF-8" /></head><body style='font-size: 10pt; font-family: Verdana,Geneva,sans-serif'>
 <div>
 <div><span>{text}</span></div>
-</body></html>"""
+</div>
+</body></html>
+"""
 
     def __init__(self, filepath):
         self.filepath = filepath
@@ -147,7 +150,26 @@ class MutableEmail:
 
         return filepath
 
-    def string_without_banneer_of(self, content, banner):
+    # Rename new mail based on size, for new mail only, append :2,
+    def rename_new_mail_based_on_size(self):
+        filepath = self.filepath
+
+        try:
+            dir = ntpath.dirname(filepath)
+            filename = ntpath.basename(filepath)
+            new_file_size = os.stat(filepath).st_size
+            new_filename = re.sub(r",S=[0-9]*,", f",S={new_file_size},", filename)
+            new_filename += ":2,"
+            new_filepath = os.path.join(dir, new_filename)
+            os.rename(filepath, new_filepath)
+            return new_filepath
+
+        except Exception as e:
+            logger.error(e)
+
+        return filepath
+
+    def string_without_banner_of(self, content, banner):
         return re.sub(banner, "", content)
 
 
@@ -159,7 +181,7 @@ class MutableEmail:
 
 
 class MutableEmailAA(MutableEmail):
-    def add_banners(self, banner_plain_text, banner_html):
+    def add_banners(self, banner_plain_text, banner_html, is_new_mail=False):
         filepath = self.filepath
 
         try:
@@ -183,13 +205,13 @@ class MutableEmailAA(MutableEmail):
                     new_msg[k] = v
 
                 for part in msg.walk():
+                    assert part.get_content_type() == "text/plain"
+
                     content = part.get_payload(decode=True).decode("utf-8")
                     new_msg.attach(
                         MIMEText(
                             banner_plain_text
-                            + self.string_without_banneer_of(
-                                content, banner_plain_text
-                            ),
+                            + self.string_without_banner_of(content, banner_plain_text),
                             "plain",
                         )
                     )
@@ -197,7 +219,7 @@ class MutableEmailAA(MutableEmail):
                         MIMEText(
                             banner_html
                             + self.wrap_text_with_default_html(
-                                self.string_without_banneer_of(content, banner_html)
+                                self.string_without_banner_of(content, banner_html)
                             ),
                             "html",
                         )
@@ -219,7 +241,10 @@ class MutableEmailAA(MutableEmail):
                 f.write(new_msg.as_string())
                 f.truncate()
 
-            new_filepath = self.rename_file_based_on_size()
+            if is_new_mail:
+                new_filepath = self.rename_new_mail_based_on_size()
+            else:
+                new_filepath = self.rename_file_based_on_size()
 
             return MutableEmailCA(new_filepath)
 
@@ -237,7 +262,7 @@ class MutableEmailAA(MutableEmail):
 
 
 class MutableEmailBA(MutableEmail):
-    def add_banners(self, banner_plain_text, banner_html):
+    def add_banners(self, banner_plain_text, banner_html, is_new_mail=False):
         filepath = self.filepath
 
         try:
@@ -261,6 +286,8 @@ class MutableEmailBA(MutableEmail):
                     new_msg[k] = v
 
                 for part in msg.walk():
+                    assert part.get_content_type() == "text/plain"
+
                     content = part.get_payload(decode=True).decode("utf-8")
                     assert content == ""
 
@@ -293,7 +320,10 @@ class MutableEmailBA(MutableEmail):
                 f.write(new_msg.as_string())
                 f.truncate()
 
-            new_filepath = self.rename_file_based_on_size()
+            if is_new_mail:
+                new_filepath = self.rename_new_mail_based_on_size()
+            else:
+                new_filepath = self.rename_file_based_on_size()
 
             return MutableEmailCA(new_filepath)
 
@@ -313,7 +343,7 @@ class MutableEmailBA(MutableEmail):
 
 
 class MutableEmailCA(MutableEmail):
-    def add_banners(self, banner_plain_text, banner_html):
+    def add_banners(self, banner_plain_text, banner_html, is_new_mail=False):
         filepath = self.filepath
 
         try:
@@ -337,21 +367,29 @@ class MutableEmailCA(MutableEmail):
                     new_msg[k] = v
 
                 for part in msg.walk():
-                    content = part.get_payload(decode=True).decode("utf-8")
-                    assert content == ""
+                    if part.get_content_maintype() == "text":
+                        content = part.get_payload(decode=True).decode("utf-8")
+                        if part.get_content_subtype() == "plain":
+                            new_msg.attach(
+                                MIMEText(
+                                    banner_plain_text
+                                    + self.string_without_banner_of(
+                                        content, banner_plain_text
+                                    ),
+                                    "plain",
+                                )
+                            )
 
-                    new_msg.attach(
-                        MIMEText(
-                            banner_plain_text,
-                            "plain",
-                        )
-                    )
-                    new_msg.attach(
-                        MIMEText(
-                            banner_html + self.default_html,
-                            "html",
-                        )
-                    )
+                        elif part.get_content_subtype() == "html":
+                            new_msg.attach(
+                                MIMEText(
+                                    banner_html
+                                    + self.string_without_banner_of(
+                                        content, banner_html
+                                    ),
+                                    "html",
+                                )
+                            )
 
                 #### Testing only ####
                 ######################
@@ -369,7 +407,10 @@ class MutableEmailCA(MutableEmail):
                 f.write(new_msg.as_string())
                 f.truncate()
 
-            new_filepath = self.rename_file_based_on_size()
+            if is_new_mail:
+                new_filepath = self.rename_new_mail_based_on_size()
+            else:
+                new_filepath = self.rename_file_based_on_size()
 
             return MutableEmailCA(new_filepath)
 
@@ -405,7 +446,7 @@ class MutableEmailCA(MutableEmail):
                     if part.get_content_subtype() == "plain":
                         new_msg.attach(
                             MIMEText(
-                                self.string_without_banneer_of(
+                                self.string_without_banner_of(
                                     content, banner_plain_text
                                 ),
                                 "plain",
@@ -415,7 +456,7 @@ class MutableEmailCA(MutableEmail):
                     elif part.get_content_subtype() == "html":
                         new_msg.attach(
                             MIMEText(
-                                self.string_without_banneer_of(content, banner_html),
+                                self.string_without_banner_of(content, banner_html),
                                 "html",
                             )
                         )
@@ -441,8 +482,82 @@ class MutableEmailCA(MutableEmail):
         return MutableEmailCA(new_filepath)
 
 
+"""
+(d) Empty html body + (a) No attachment(s)
+(Content-Type, charset, Content-Disposition) are as follows:
+("text/html", "utf-8", None)
+"""
+
+
 class MutableEmailDA(MutableEmail):
-    pass
+    def add_banners(self, banner_plain_text, banner_html, is_new_mail=False):
+        filepath = self.filepath
+
+        try:
+            with open(filepath, "r+") as f:
+                # Use policy=policy.default so that this returns an EmailMessage object instead of Message object.
+                # Whole email message including both headers and content.
+                msg = email.message_from_file(f, policy=policy.default)
+
+                new_msg = MIMEMultipart("alternative")
+
+                # Exclude "Content-Type" and "MIME-Version" because MIMEMultipart('alternative') already contains them.
+                # Exclude "Content-Transfer-Encoding" because 'alternative' does not have this but plain text email has this.
+                headers = list(
+                    (k, v)
+                    for (k, v) in msg.items()
+                    if k
+                    not in ("Content-Type", "MIME-Version", "Content-Transfer-Encoding")
+                )
+
+                for k, v in headers:
+                    new_msg[k] = v
+
+                for part in msg.walk():
+                    assert part.get_content_type() == "text/html"
+
+                    new_msg.attach(
+                        MIMEText(
+                            banner_plain_text,
+                            "plain",
+                        )
+                    )
+                    #### To make the mails consistent, I use the self.default_html
+                    # and neglect the current default html.
+                    new_msg.attach(
+                        MIMEText(
+                            banner_html + self.default_html,
+                            "html",
+                        )
+                    )
+
+                #### Testing only ####
+                ######################
+                # print(new_msg.as_string())
+                dir = ntpath.dirname(ntpath.dirname(filepath))
+                filename = ntpath.basename(filepath)
+                backup_dir = os.path.join(dir, "backup")
+                backup_filepath = os.path.join(backup_dir, filename)
+                Path(backup_dir).mkdir(exist_ok=True)
+                copyfile(filepath, backup_filepath)
+                #### Testing only END ####
+                ######################
+
+                f.seek(0)
+                f.write(new_msg.as_string())
+                f.truncate()
+
+            if is_new_mail:
+                new_filepath = self.rename_new_mail_based_on_size()
+            else:
+                new_filepath = self.rename_file_based_on_size()
+
+            return MutableEmailCA(new_filepath)
+
+        except Exception as e:
+            logger.error(e)
+
+        return self
 
 
 class MutableEmailEA(MutableEmail):
@@ -477,17 +592,21 @@ class MutableEmailFB(MutableEmail):
     pass
 
 
-filepath = "/mailu/mail/cs@michaelfong.co/cur/1636096711.M127784P6455.f9db57f63506,S=1579,W=1621:2,S"
+filepath = "/mailu/mail/cs@michaelfong.co/cur/1636096733.M54203P6455.f9db57f63506,S=2782,W=1139:2,S"
 mutable_email = MutableEmailFactory.create_mutable_email(filepath)
 print(type(mutable_email))
+
 mutable_email = mutable_email.add_banners(
     UNKNOWN_BANNER_PLAIN_TEXT, UNKNOWN_BANNER_HTML
 )
 print(type(mutable_email))
+print(mutable_email.filepath)
+
 mutable_email = mutable_email.remove_banners_if_exist(
     OLD_UNKNOWN_BANNER_PLAIN_TEXT, OLD_UNKNOWN_BANNER_HTML
 )
 print(type(mutable_email))
+print(mutable_email.filepath)
 
 
 # %%
