@@ -120,7 +120,7 @@ class MutableEmail:
 
 </body></html>"""
 
-    def wrap_text_with_default_html(text):
+    def wrap_text_with_default_html(self, text):
         return f"""<html><head><meta http-equiv="Content-Type" content="text/html; charset=UTF-8" /></head><body style='font-size: 10pt; font-family: Verdana,Geneva,sans-serif'>
 <div>
 <div><span>{text}</span></div>
@@ -226,7 +226,7 @@ class MutableEmailAA(MutableEmail):
         except Exception as e:
             logger.error(e)
 
-        return MutableEmailAA(filepath)
+        return self
 
 
 """
@@ -300,7 +300,7 @@ class MutableEmailBA(MutableEmail):
         except Exception as e:
             logger.error(e)
 
-        return MutableEmailBA(filepath)
+        return self
 
 
 """
@@ -313,9 +313,70 @@ class MutableEmailBA(MutableEmail):
 
 
 class MutableEmailCA(MutableEmail):
-    def add_banners(self):
-        print(self.filepath)
-        return MutableEmailCA("filepath_CA")
+    def add_banners(self, banner_plain_text, banner_html):
+        filepath = self.filepath
+
+        try:
+            with open(filepath, "r+") as f:
+                # Use policy=policy.default so that this returns an EmailMessage object instead of Message object.
+                # Whole email message including both headers and content.
+                msg = email.message_from_file(f, policy=policy.default)
+
+                new_msg = MIMEMultipart("alternative")
+
+                # Exclude "Content-Type" and "MIME-Version" because MIMEMultipart('alternative') already contains them.
+                # Exclude "Content-Transfer-Encoding" because 'alternative' does not have this but plain text email has this.
+                headers = list(
+                    (k, v)
+                    for (k, v) in msg.items()
+                    if k
+                    not in ("Content-Type", "MIME-Version", "Content-Transfer-Encoding")
+                )
+
+                for k, v in headers:
+                    new_msg[k] = v
+
+                for part in msg.walk():
+                    content = part.get_payload(decode=True).decode("utf-8")
+                    assert content == ""
+
+                    new_msg.attach(
+                        MIMEText(
+                            banner_plain_text,
+                            "plain",
+                        )
+                    )
+                    new_msg.attach(
+                        MIMEText(
+                            banner_html + self.default_html,
+                            "html",
+                        )
+                    )
+
+                #### Testing only ####
+                ######################
+                # print(new_msg.as_string())
+                dir = ntpath.dirname(ntpath.dirname(filepath))
+                filename = ntpath.basename(filepath)
+                backup_dir = os.path.join(dir, "backup")
+                backup_filepath = os.path.join(backup_dir, filename)
+                Path(backup_dir).mkdir(exist_ok=True)
+                copyfile(filepath, backup_filepath)
+                #### Testing only END ####
+                ######################
+
+                f.seek(0)
+                f.write(new_msg.as_string())
+                f.truncate()
+
+            new_filepath = self.rename_file_based_on_size()
+
+            return MutableEmailCA(new_filepath)
+
+        except Exception as e:
+            logger.error(e)
+
+        return self
 
     def remove_banners_if_exist(self, banner_plain_text, banner_html):
         filepath = self.filepath
@@ -416,7 +477,7 @@ class MutableEmailFB(MutableEmail):
     pass
 
 
-filepath = "/mailu/mail/cs@michaelfong.co/cur/1636532731.M640604P27060.f9db57f63506,S=847,W=868:2,S"
+filepath = "/mailu/mail/cs@michaelfong.co/cur/1636096711.M127784P6455.f9db57f63506,S=1579,W=1621:2,S"
 mutable_email = MutableEmailFactory.create_mutable_email(filepath)
 print(type(mutable_email))
 mutable_email = mutable_email.add_banners(
