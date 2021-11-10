@@ -116,6 +116,16 @@ class MutableEmailFactory:
 
 
 class MutableEmail:
+    default_html = """<html><head><meta http-equiv="Content-Type" content="text/html; charset=UTF-8" /></head><body style='font-size: 10pt; font-family: Verdana,Geneva,sans-serif'>
+
+</body></html>"""
+
+    def wrap_text_with_default_html(text):
+        return f"""<html><head><meta http-equiv="Content-Type" content="text/html; charset=UTF-8" /></head><body style='font-size: 10pt; font-family: Verdana,Geneva,sans-serif'>
+<div>
+<div><span>{text}</span></div>
+</body></html>"""
+
     def __init__(self, filepath):
         self.filepath = filepath
 
@@ -186,7 +196,9 @@ class MutableEmailAA(MutableEmail):
                     new_msg.attach(
                         MIMEText(
                             banner_html
-                            + self.string_without_banneer_of(content, banner_html),
+                            + self.wrap_text_with_default_html(
+                                self.string_without_banneer_of(content, banner_html)
+                            ),
                             "html",
                         )
                     )
@@ -250,19 +262,17 @@ class MutableEmailBA(MutableEmail):
 
                 for part in msg.walk():
                     content = part.get_payload(decode=True).decode("utf-8")
+                    assert content == ""
+
                     new_msg.attach(
                         MIMEText(
-                            banner_plain_text
-                            + self.string_without_banneer_of(
-                                content, banner_plain_text
-                            ),
+                            banner_plain_text,
                             "plain",
                         )
                     )
                     new_msg.attach(
                         MIMEText(
-                            banner_html
-                            + self.string_without_banneer_of(content, banner_html),
+                            banner_html + self.default_html,
                             "html",
                         )
                     )
@@ -344,8 +354,7 @@ class MutableEmailCA(MutableEmail):
                     elif part.get_content_subtype() == "html":
                         new_msg.attach(
                             MIMEText(
-                                "test"
-                                + self.string_without_banneer_of(content, banner_html),
+                                self.string_without_banneer_of(content, banner_html),
                                 "html",
                             )
                         )
@@ -407,17 +416,17 @@ class MutableEmailFB(MutableEmail):
     pass
 
 
-filepath = "/mailu/mail/cs@michaelfong.co/cur/1636097155.M42624P6644.f9db57f63506,S=1366202,W=1383995:2,S"
+filepath = "/mailu/mail/cs@michaelfong.co/cur/1636532731.M640604P27060.f9db57f63506,S=847,W=868:2,S"
 mutable_email = MutableEmailFactory.create_mutable_email(filepath)
 print(type(mutable_email))
-# mutable_email = mutable_email.add_banners(
-#     UNKNOWN_BANNER_PLAIN_TEXT, UNKNOWN_BANNER_HTML
-# )
-# print(type(mutabe_emlail))
-# mutable_email = mutable_email.remove_banners_if_exist(
-#     OLD_UNKNOWN_BANNER_PLAIN_TEXT, OLD_UNKNOWN_BANNER_HTML
-# )
-# print(type(mutable_email))
+mutable_email = mutable_email.add_banners(
+    UNKNOWN_BANNER_PLAIN_TEXT, UNKNOWN_BANNER_HTML
+)
+print(type(mutable_email))
+mutable_email = mutable_email.remove_banners_if_exist(
+    OLD_UNKNOWN_BANNER_PLAIN_TEXT, OLD_UNKNOWN_BANNER_HTML
+)
+print(type(mutable_email))
 
 
 # %%
