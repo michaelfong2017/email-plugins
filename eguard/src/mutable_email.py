@@ -833,45 +833,736 @@ class MutableEmailFA(MutableEmail):
         return self
 
 
+##########################################################
+##########################################################
+##########################################################
+#### With attachment below ####
+##########################################################
+##########################################################
+##########################################################
+
+"""
+(a) Plain text body + (b) Has attachment(s)
+(Content-Type, charset, Content-Disposition) are as follows:
+("multipart/mixed", None, None)
+("text/plain", "us-ascii", None)
+("text/plain", None, "attachment")
+("application/pdf", None, "attachment")
+("image/jpeg", None, "attachment")
+"""
+
+
 class MutableEmailAB(MutableEmail):
-    pass
+    def add_banners(self, banner_plain_text, banner_html, is_new_mail=False):
+        filepath = self.filepath
+
+        try:
+            with open(filepath, "r+") as f:
+                # Use policy=policy.default so that this returns an EmailMessage object instead of Message object.
+                # Whole email message including both headers and content.
+                msg = email.message_from_file(f, policy=policy.default)
+
+                new_msg = MIMEMultipart("mixed")
+                alternative = MIMEMultipart("alternative")
+                is_alternative_attached = False
+
+                # Exclude "Content-Type" and "MIME-Version" because MIMEMultipart('alternative') already contains them.
+                # Exclude "Content-Transfer-Encoding" because 'alternative' does not have this but plain text email has this.
+                headers = list(
+                    (k, v)
+                    for (k, v) in msg.items()
+                    if k
+                    not in ("Content-Type", "MIME-Version", "Content-Transfer-Encoding")
+                )
+
+                for k, v in headers:
+                    new_msg[k] = v
+
+                for part in msg.walk():
+                    if (
+                        part.get_content_type() == "text/plain"
+                        and part.get_content_disposition() != "attachment"
+                    ):
+                        content = part.get_payload(decode=True).decode("utf-8")
+                        alternative.attach(
+                            MIMEText(
+                                banner_plain_text
+                                + self.string_without_banner_of(
+                                    content, banner_plain_text
+                                ),
+                                "plain",
+                            )
+                        )
+                        alternative.attach(
+                            MIMEText(
+                                banner_html
+                                + self.wrap_text_with_default_html(
+                                    self.string_without_banner_of(content, banner_html)
+                                ),
+                                "html",
+                            )
+                        )
+                    elif part.get_content_disposition() == "attachment":
+                        if not is_alternative_attached:
+                            is_alternative_attached = True
+                            new_msg.attach(alternative)
+
+                        new_msg.attach(part)
+
+                #### Testing only ####
+                ######################
+                # print(new_msg.as_string())
+                dir = ntpath.dirname(ntpath.dirname(filepath))
+                filename = ntpath.basename(filepath)
+                backup_dir = os.path.join(dir, "backup")
+                backup_filepath = os.path.join(backup_dir, filename)
+                Path(backup_dir).mkdir(exist_ok=True)
+                copyfile(filepath, backup_filepath)
+                #### Testing only END ####
+                ######################
+
+                f.seek(0)
+                f.write(new_msg.as_string())
+                f.truncate()
+
+            if is_new_mail:
+                new_filepath = self.rename_new_mail_based_on_size()
+            else:
+                new_filepath = self.rename_file_based_on_size()
+
+            return MutableEmailCB(new_filepath)
+
+        except Exception as e:
+            logger.error(e)
+
+        return self
+
+
+"""
+(b) Empty plain text body + (b) Has attachment(s)
+(Content-Type, charset, Content-Disposition) are as follows:
+("multipart/mixed", None, None)
+("text/plain", None, "attachment")
+("application/pdf", None, "attachment")
+("image/jpeg", None, "attachment")
+"""
 
 
 class MutableEmailBB(MutableEmail):
-    pass
+    def add_banners(self, banner_plain_text, banner_html, is_new_mail=False):
+        filepath = self.filepath
+
+        try:
+            with open(filepath, "r+") as f:
+                # Use policy=policy.default so that this returns an EmailMessage object instead of Message object.
+                # Whole email message including both headers and content.
+                msg = email.message_from_file(f, policy=policy.default)
+
+                new_msg = MIMEMultipart("mixed")
+
+                # Exclude "Content-Type" and "MIME-Version" because MIMEMultipart('alternative') already contains them.
+                # Exclude "Content-Transfer-Encoding" because 'alternative' does not have this but plain text email has this.
+                headers = list(
+                    (k, v)
+                    for (k, v) in msg.items()
+                    if k
+                    not in ("Content-Type", "MIME-Version", "Content-Transfer-Encoding")
+                )
+
+                for k, v in headers:
+                    new_msg[k] = v
+
+                alternative = MIMEMultipart("alternative")
+                alternative.attach(
+                    MIMEText(
+                        banner_plain_text,
+                        "plain",
+                    )
+                )
+                alternative.attach(
+                    MIMEText(
+                        banner_html + self.default_html,
+                        "html",
+                    )
+                )
+                new_msg.attach(alternative)
+
+                for part in msg.walk():
+                    if part.get_content_disposition() == "attachment":
+                        new_msg.attach(part)
+
+                #### Testing only ####
+                ######################
+                # print(new_msg.as_string())
+                dir = ntpath.dirname(ntpath.dirname(filepath))
+                filename = ntpath.basename(filepath)
+                backup_dir = os.path.join(dir, "backup")
+                backup_filepath = os.path.join(backup_dir, filename)
+                Path(backup_dir).mkdir(exist_ok=True)
+                copyfile(filepath, backup_filepath)
+                #### Testing only END ####
+                ######################
+
+                f.seek(0)
+                f.write(new_msg.as_string())
+                f.truncate()
+
+            if is_new_mail:
+                new_filepath = self.rename_new_mail_based_on_size()
+            else:
+                new_filepath = self.rename_file_based_on_size()
+
+            return MutableEmailCB(new_filepath)
+
+        except Exception as e:
+            logger.error(e)
+
+        return self
+
+
+"""
+(c) Html text body without inline image(s) + (b) Has attachment(s)
+(Content-Type, charset, Content-Disposition) are as follows:
+("multipart/mixed", None, None)
+("multipart/alternative", None, None)
+("text/plain", "us-ascii", None)
+("text/html", "utf-8", None)
+("text/plain", None, "attachment")
+("application/pdf", None, "attachment")
+("image/jpeg", None, "attachment")
+"""
 
 
 class MutableEmailCB(MutableEmail):
-    pass
+    def add_banners(self, banner_plain_text, banner_html, is_new_mail=False):
+        filepath = self.filepath
+
+        try:
+            with open(filepath, "r+") as f:
+                # Use policy=policy.default so that this returns an EmailMessage object instead of Message object.
+                # Whole email message including both headers and content.
+                msg = email.message_from_file(f, policy=policy.default)
+
+                new_msg = MIMEMultipart("mixed")
+                alternative = MIMEMultipart("alternative")
+                is_alternative_attached = False
+
+                # Exclude "Content-Type" and "MIME-Version" because MIMEMultipart('alternative') already contains them.
+                # Exclude "Content-Transfer-Encoding" because 'alternative' does not have this but plain text email has this.
+                headers = list(
+                    (k, v)
+                    for (k, v) in msg.items()
+                    if k
+                    not in ("Content-Type", "MIME-Version", "Content-Transfer-Encoding")
+                )
+
+                for k, v in headers:
+                    new_msg[k] = v
+
+                for part in msg.walk():
+                    if (
+                        part.get_content_maintype() == "text"
+                        and part.get_content_disposition() != "attachment"
+                    ):
+                        content = part.get_payload(decode=True).decode("utf-8")
+                        if part.get_content_subtype() == "plain":
+                            alternative.attach(
+                                MIMEText(
+                                    banner_plain_text
+                                    + self.string_without_banner_of(
+                                        content, banner_plain_text
+                                    ),
+                                    "plain",
+                                )
+                            )
+
+                        elif part.get_content_subtype() == "html":
+                            alternative.attach(
+                                MIMEText(
+                                    banner_html
+                                    + self.string_without_banner_of(
+                                        content, banner_html
+                                    ),
+                                    "html",
+                                )
+                            )
+
+                    elif part.get_content_disposition() == "attachment":
+                        if not is_alternative_attached:
+                            is_alternative_attached = True
+                            new_msg.attach(alternative)
+
+                        new_msg.attach(part)
+
+                #### Testing only ####
+                ######################
+                # print(new_msg.as_string())
+                dir = ntpath.dirname(ntpath.dirname(filepath))
+                filename = ntpath.basename(filepath)
+                backup_dir = os.path.join(dir, "backup")
+                backup_filepath = os.path.join(backup_dir, filename)
+                Path(backup_dir).mkdir(exist_ok=True)
+                copyfile(filepath, backup_filepath)
+                #### Testing only END ####
+                ######################
+
+                f.seek(0)
+                f.write(new_msg.as_string())
+                f.truncate()
+
+            if is_new_mail:
+                new_filepath = self.rename_new_mail_based_on_size()
+            else:
+                new_filepath = self.rename_file_based_on_size()
+
+            return MutableEmailCA(new_filepath)
+
+        except Exception as e:
+            logger.error(e)
+
+        return self
+
+    def remove_banners_if_exist(self, banner_plain_text, banner_html):
+        filepath = self.filepath
+
+        try:
+            with open(filepath, "r+") as f:
+                # Use policy=policy.default so that this returns an EmailMessage object instead of Message object.
+                # Whole email message including both headers and content.
+                msg = email.message_from_file(f, policy=policy.default)
+
+                new_msg = MIMEMultipart("alternative")
+
+                # Exclude "Content-Type" and "MIME-Version" because MIMEMultipart('alternative') already contains them.
+                # Exclude "Content-Transfer-Encoding" because 'alternative' does not have this but plain text email has this.
+                headers = list(
+                    (k, v)
+                    for (k, v) in msg.items()
+                    if k
+                    not in ("Content-Type", "MIME-Version", "Content-Transfer-Encoding")
+                )
+
+                for k, v in headers:
+                    new_msg[k] = v
+
+                for part in msg.walk():
+                    if part.get_content_maintype() == "text":
+                        content = part.get_payload(decode=True).decode("utf-8")
+                        if part.get_content_subtype() == "plain":
+                            new_msg.attach(
+                                MIMEText(
+                                    self.string_without_banner_of(
+                                        content, banner_plain_text
+                                    ),
+                                    "plain",
+                                )
+                            )
+
+                        elif part.get_content_subtype() == "html":
+                            new_msg.attach(
+                                MIMEText(
+                                    self.string_without_banner_of(content, banner_html),
+                                    "html",
+                                )
+                            )
+
+                #### Testing only ####
+                ######################
+                # print(new_msg.as_string())
+                dir = ntpath.dirname(ntpath.dirname(filepath))
+                filename = ntpath.basename(filepath)
+                backup_dir = os.path.join(dir, "backup")
+                backup_filepath = os.path.join(backup_dir, filename)
+                Path(backup_dir).mkdir(exist_ok=True)
+                copyfile(filepath, backup_filepath)
+                #### Testing only END ####
+                ######################
+
+                f.seek(0)
+                f.write(new_msg.as_string())
+                f.truncate()
+
+            new_filepath = self.rename_file_based_on_size()
+
+            return MutableEmailCA(new_filepath)
+
+        except Exception as e:
+            logger.error(e)
+
+        return self
+
+
+"""
+(d) Empty html body + (b) Has attachment(s)
+(Content-Type, charset, Content-Disposition) are as follows:
+("multipart/mixed", None, None)
+("text/html", "utf-8", None)
+("text/plain", None, "attachment")
+("application/pdf", None, "attachment")
+("image/jpeg", None, "attachment")
+"""
 
 
 class MutableEmailDB(MutableEmail):
-    pass
+    def add_banners(self, banner_plain_text, banner_html, is_new_mail=False):
+        filepath = self.filepath
+
+        try:
+            with open(filepath, "r+") as f:
+                # Use policy=policy.default so that this returns an EmailMessage object instead of Message object.
+                # Whole email message including both headers and content.
+                msg = email.message_from_file(f, policy=policy.default)
+
+                new_msg = MIMEMultipart("alternative")
+
+                # Exclude "Content-Type" and "MIME-Version" because MIMEMultipart('alternative') already contains them.
+                # Exclude "Content-Transfer-Encoding" because 'alternative' does not have this but plain text email has this.
+                headers = list(
+                    (k, v)
+                    for (k, v) in msg.items()
+                    if k
+                    not in ("Content-Type", "MIME-Version", "Content-Transfer-Encoding")
+                )
+
+                for k, v in headers:
+                    new_msg[k] = v
+
+                for part in msg.walk():
+                    assert part.get_content_type() == "text/html"
+
+                    new_msg.attach(
+                        MIMEText(
+                            banner_plain_text,
+                            "plain",
+                        )
+                    )
+                    #### To make the mails consistent, I use the self.default_html
+                    # and neglect the current default html.
+                    new_msg.attach(
+                        MIMEText(
+                            banner_html + self.default_html,
+                            "html",
+                        )
+                    )
+
+                #### Testing only ####
+                ######################
+                # print(new_msg.as_string())
+                dir = ntpath.dirname(ntpath.dirname(filepath))
+                filename = ntpath.basename(filepath)
+                backup_dir = os.path.join(dir, "backup")
+                backup_filepath = os.path.join(backup_dir, filename)
+                Path(backup_dir).mkdir(exist_ok=True)
+                copyfile(filepath, backup_filepath)
+                #### Testing only END ####
+                ######################
+
+                f.seek(0)
+                f.write(new_msg.as_string())
+                f.truncate()
+
+            if is_new_mail:
+                new_filepath = self.rename_new_mail_based_on_size()
+            else:
+                new_filepath = self.rename_file_based_on_size()
+
+            return MutableEmailCA(new_filepath)
+
+        except Exception as e:
+            logger.error(e)
+
+        return self
+
+
+"""
+(e) Html text body with inline image(s) + (b) Has attachment(s)
+(Content-Type, charset, Content-Disposition) are as follows:
+("multipart/mixed", None, None)
+("multipart/alternative", None, None)
+("text/plain", "us-ascii", None)
+("multipart/related", None, None)
+("text/html", "utf-8", None)
+("image/jpeg", None, "inline")
+("image/png", None, "inline")
+("text/plain", None, "attachment")
+("application/pdf", None, "attachment")
+("image/jpeg", None, "attachment")
+"""
 
 
 class MutableEmailEB(MutableEmail):
-    pass
+    def add_banners(self, banner_plain_text, banner_html, is_new_mail=False):
+        filepath = self.filepath
+
+        try:
+            with open(filepath, "r+") as f:
+                # Use policy=policy.default so that this returns an EmailMessage object instead of Message object.
+                # Whole email message including both headers and content.
+                msg = email.message_from_file(f, policy=policy.default)
+
+                new_msg = MIMEMultipart("alternative")
+
+                # Exclude "Content-Type" and "MIME-Version" because MIMEMultipart('alternative') already contains them.
+                # Exclude "Content-Transfer-Encoding" because 'alternative' does not have this but plain text email has this.
+                headers = list(
+                    (k, v)
+                    for (k, v) in msg.items()
+                    if k
+                    not in ("Content-Type", "MIME-Version", "Content-Transfer-Encoding")
+                )
+
+                for k, v in headers:
+                    new_msg[k] = v
+
+                related = None
+                for part in msg.walk():
+                    if part.get_content_maintype() == "text":
+                        content = part.get_payload(decode=True).decode("utf-8")
+                        if part.get_content_subtype() == "plain":
+                            new_msg.attach(
+                                MIMEText(
+                                    banner_plain_text
+                                    + self.string_without_banner_of(
+                                        content, banner_plain_text
+                                    ),
+                                    "plain",
+                                )
+                            )
+
+                        elif part.get_content_subtype() == "html":
+                            related = MIMEMultipart("related")
+                            related.attach(
+                                MIMEText(
+                                    banner_html
+                                    + self.string_without_banner_of(
+                                        content, banner_html
+                                    ),
+                                    "html",
+                                )
+                            )
+
+                    elif part.get_content_disposition() == "inline":
+                        assert related != None
+                        related.attach(part)
+
+                assert related != None
+                new_msg.attach(related)
+
+                #### Testing only ####
+                ######################
+                # print(new_msg.as_string())
+                dir = ntpath.dirname(ntpath.dirname(filepath))
+                filename = ntpath.basename(filepath)
+                backup_dir = os.path.join(dir, "backup")
+                backup_filepath = os.path.join(backup_dir, filename)
+                Path(backup_dir).mkdir(exist_ok=True)
+                copyfile(filepath, backup_filepath)
+                #### Testing only END ####
+                ######################
+
+                f.seek(0)
+                f.write(new_msg.as_string())
+                f.truncate()
+
+            if is_new_mail:
+                new_filepath = self.rename_new_mail_based_on_size()
+            else:
+                new_filepath = self.rename_file_based_on_size()
+
+            return MutableEmailEA(new_filepath)
+
+        except Exception as e:
+            logger.error(e)
+
+        return self
+
+    def remove_banners_if_exist(self, banner_plain_text, banner_html):
+        filepath = self.filepath
+
+        try:
+            with open(filepath, "r+") as f:
+                # Use policy=policy.default so that this returns an EmailMessage object instead of Message object.
+                # Whole email message including both headers and content.
+                msg = email.message_from_file(f, policy=policy.default)
+
+                new_msg = MIMEMultipart("alternative")
+
+                # Exclude "Content-Type" and "MIME-Version" because MIMEMultipart('alternative') already contains them.
+                # Exclude "Content-Transfer-Encoding" because 'alternative' does not have this but plain text email has this.
+                headers = list(
+                    (k, v)
+                    for (k, v) in msg.items()
+                    if k
+                    not in ("Content-Type", "MIME-Version", "Content-Transfer-Encoding")
+                )
+
+                for k, v in headers:
+                    new_msg[k] = v
+
+                related = None
+                for part in msg.walk():
+                    if part.get_content_maintype() == "text":
+                        content = part.get_payload(decode=True).decode("utf-8")
+                        if part.get_content_subtype() == "plain":
+                            new_msg.attach(
+                                MIMEText(
+                                    self.string_without_banner_of(
+                                        content, banner_plain_text
+                                    ),
+                                    "plain",
+                                )
+                            )
+
+                        elif part.get_content_subtype() == "html":
+                            related = MIMEMultipart("related")
+                            related.attach(
+                                MIMEText(
+                                    self.string_without_banner_of(content, banner_html),
+                                    "html",
+                                )
+                            )
+
+                    elif part.get_content_disposition() == "inline":
+                        assert related != None
+                        related.attach(part)
+
+                assert related != None
+                new_msg.attach(related)
+
+                #### Testing only ####
+                ######################
+                # print(new_msg.as_string())
+                dir = ntpath.dirname(ntpath.dirname(filepath))
+                filename = ntpath.basename(filepath)
+                backup_dir = os.path.join(dir, "backup")
+                backup_filepath = os.path.join(backup_dir, filename)
+                Path(backup_dir).mkdir(exist_ok=True)
+                copyfile(filepath, backup_filepath)
+                #### Testing only END ####
+                ######################
+
+                f.seek(0)
+                f.write(new_msg.as_string())
+                f.truncate()
+
+            new_filepath = self.rename_file_based_on_size()
+
+            return MutableEmailEA(new_filepath)
+
+        except Exception as e:
+            logger.error(e)
+
+        return self
+
+
+"""
+(f) Only inline image(s) + (b) Has attachment(s)
+(Content-Type, charset, Content-Disposition) are as follows:
+("multipart/mixed", None, None)
+("multipart/related", None, None)
+("text/html", "utf-8", None)
+("image/jpeg", None, "inline")
+("image/png", None, "inline")
+("text/plain", None, "attachment")
+("application/pdf", None, "attachment")
+("image/jpeg", None, "attachment")
+"""
 
 
 class MutableEmailFB(MutableEmail):
-    pass
+    def add_banners(self, banner_plain_text, banner_html, is_new_mail=False):
+        filepath = self.filepath
+
+        try:
+            with open(filepath, "r+") as f:
+                # Use policy=policy.default so that this returns an EmailMessage object instead of Message object.
+                # Whole email message including both headers and content.
+                msg = email.message_from_file(f, policy=policy.default)
+
+                new_msg = MIMEMultipart("alternative")
+
+                # Exclude "Content-Type" and "MIME-Version" because MIMEMultipart('alternative') already contains them.
+                # Exclude "Content-Transfer-Encoding" because 'alternative' does not have this but plain text email has this.
+                headers = list(
+                    (k, v)
+                    for (k, v) in msg.items()
+                    if k
+                    not in ("Content-Type", "MIME-Version", "Content-Transfer-Encoding")
+                )
+
+                for k, v in headers:
+                    new_msg[k] = v
+
+                new_msg.attach(
+                    MIMEText(
+                        banner_plain_text,
+                        "plain",
+                    )
+                )
+                related = None
+                for part in msg.walk():
+                    if part.get_content_type() == "text/html":
+                        content = part.get_payload(decode=True).decode("utf-8")
+                        related = MIMEMultipart("related")
+                        related.attach(
+                            MIMEText(
+                                banner_html
+                                + self.string_without_banner_of(content, banner_html),
+                                "html",
+                            )
+                        )
+
+                    elif part.get_content_disposition() == "inline":
+                        assert related != None
+                        related.attach(part)
+
+                assert related != None
+                new_msg.attach(related)
+
+                #### Testing only ####
+                ######################
+                # print(new_msg.as_string())
+                dir = ntpath.dirname(ntpath.dirname(filepath))
+                filename = ntpath.basename(filepath)
+                backup_dir = os.path.join(dir, "backup")
+                backup_filepath = os.path.join(backup_dir, filename)
+                Path(backup_dir).mkdir(exist_ok=True)
+                copyfile(filepath, backup_filepath)
+                #### Testing only END ####
+                ######################
+
+                f.seek(0)
+                f.write(new_msg.as_string())
+                f.truncate()
+
+            if is_new_mail:
+                new_filepath = self.rename_new_mail_based_on_size()
+            else:
+                new_filepath = self.rename_file_based_on_size()
+
+            return MutableEmailCA(new_filepath)
+
+        except Exception as e:
+            logger.error(e)
+
+        return self
 
 
-filepath = "/mailu/mail/cs@michaelfong.co/cur/1636096884.M878900P6574.f9db57f63506,S=372352,W=375450:2,S"
+filepath = "/mailu/mail/cs@michaelfong.co/cur/1636097029.M531700P6644.f9db57f63506,S=997175,W=1010168:2,S"
 mutable_email = MutableEmailFactory.create_mutable_email(filepath)
 print(type(mutable_email))
 
-# mutable_email = mutable_email.add_banners(
-#     UNKNOWN_BANNER_PLAIN_TEXT, UNKNOWN_BANNER_HTML
-# )
-# print(type(mutable_email))
-# print(mutable_email.filepath)
-
-mutable_email = mutable_email.remove_banners_if_exist(
-    OLD_UNKNOWN_BANNER_PLAIN_TEXT, OLD_UNKNOWN_BANNER_HTML
+mutable_email = mutable_email.add_banners(
+    UNKNOWN_BANNER_PLAIN_TEXT, UNKNOWN_BANNER_HTML
 )
 print(type(mutable_email))
 print(mutable_email.filepath)
+
+# mutable_email = mutable_email.remove_banners_if_exist(
+#     OLD_UNKNOWN_BANNER_PLAIN_TEXT, OLD_UNKNOWN_BANNER_HTML
+# )
+# print(type(mutable_email))
+# print(mutable_email.filepath)
 
 
 # %%
