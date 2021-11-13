@@ -9,9 +9,12 @@ import os
 from pathlib import Path
 import re
 from shutil import copyfile
+import quopri
 
 logger = logging.getLogger()
 
+OLD_UNKNOWN_SUBJECT_BANNER = """[FROM NEW SENDER] """
+OLD_JUNK_SUBJECT_BANNER = """[JUNK MAIL] """
 OLD_UNKNOWN_BANNER_PLAIN_TEXT = """注意：
 這是首次接收到的電郵地址。除非您確保其真確性，否則請留意當中所附有的超連結，附件或銀行帳戶資料。如有疑問，請尋求技術人員的支援。
 CAUTION: 
@@ -22,15 +25,13 @@ authenticity of the sender.  Seek IT assistance if in doubt.
 """
 OLD_UNKNOWN_BANNER_HTML = """<p style="margin: 10px 20%; text-align: center; border: 2px solid; background-color: #ff7400; padding: 5px;"><span>注意：<br />這是首次接收到的電郵地址。除非您確保其真確性，否則請留意當中所附有的超連結，附件或銀行帳戶資料。如有疑問，請尋求技術人員的支援。</span><br />CAUTION:<br/>The domain of email sender is first seen. &nbsp;Beware of any hyperlink, attachment and bank account information unless you ensure the authenticity of the sender. &nbsp;Seek IT assistance if in doubt.&nbsp;&nbsp;</p>\n"""
 
-UNKNOWN_BANNER_PLAIN_TEXT = """注意：
-這是首次接收到的電郵地址。除非您確保其真確性，否則請留意當中所附有的超連結，附件或銀行帳戶資料。如有疑問，請尋求技術人員的支援。
-CAUTION: 
-The domain of email sender is first seen.  Beware of any
-hyperlink, attachment and bank account information unless you ensure the
-authenticity of the sender.  Seek IT assistance if in doubt.  
+##############################
+##############################
 
-"""
-UNKNOWN_BANNER_HTML = """<p style="margin: 10px 20%; text-align: center; border: 2px solid; background-color: #ff7400; padding: 5px;"><span>注意：<br />這是首次接收到的電郵地址。除非您確保其真確性，否則請留意當中所附有的超連結，附件或銀行帳戶資料。如有疑問，請尋求技術人員的支援。</span><br />CAUTION:<br/>The domain of email sender is first seen. &nbsp;Beware of any hyperlink, attachment and bank account information unless you ensure the authenticity of the sender. &nbsp;Seek IT assistance if in doubt.&nbsp;&nbsp;</p>\n"""
+UNKNOWN_SUBJECT_BANNER = OLD_UNKNOWN_SUBJECT_BANNER
+JUNK_SUBJECT_BANNER = OLD_JUNK_SUBJECT_BANNER
+UNKNOWN_BANNER_PLAIN_TEXT = OLD_UNKNOWN_BANNER_PLAIN_TEXT
+UNKNOWN_BANNER_HTML = OLD_UNKNOWN_BANNER_HTML
 
 
 class MutableEmailFactory:
@@ -166,6 +167,166 @@ class MutableEmail:
 
     def string_without_banner_of(self, content, banner):
         return re.sub(banner, "", content)
+
+    """
+    (a) Has subject without chinese characters
+    (b) Has subject with chinese characters
+    (c) No subject
+    """
+
+    def add_subject_banner(self, banner, is_new_mail=False):
+        filepath = self.filepath
+
+        try:
+            with open(filepath, "r+") as f:
+                msg = email.message_from_file(f)
+
+                parser = email.parser.HeaderParser()
+                headers = parser.parsestr(msg.as_string())
+                subject = headers["Subject"]
+
+                #### Testing only ####
+                ######################
+                # print(new_msg.as_string())
+                dir = ntpath.dirname(ntpath.dirname(filepath))
+                filename = ntpath.basename(filepath)
+                backup_dir = os.path.join(dir, "backup")
+                backup_filepath = os.path.join(backup_dir, filename)
+                Path(backup_dir).mkdir(exist_ok=True)
+                copyfile(filepath, backup_filepath)
+                #### Testing only END ####
+                ######################
+
+                if subject:
+                    pattern = r"=\?(?:UTF-8\?Q|utf-8\?q)\?(.*?)\?="
+                    match = re.match(pattern, subject)
+
+                    # (b) Has subject with chinese characters
+                    if match:
+                        content = match.groups()[0]
+                        #### THIS IS TRICKY that "=\n" is unexpectedly added and corrupts the string.
+                        #### Therefore, it has to be removed.
+                        decoded = quopri.decodestring(content, header=True).decode(
+                            "utf-8"
+                        )
+
+                        if decoded.startswith(banner):
+                            pass
+
+                        else:
+                            encoded = (
+                                quopri.encodestring(
+                                    (banner + decoded).encode("utf-8"), header=True
+                                )
+                                .decode("utf-8")
+                                .replace("=\n", "")
+                            )
+                            new_subject = f"=?utf-8?q?{encoded}?="
+
+                            #### Make changes to the file
+                            headers.replace_header("Subject", new_subject)
+                            f.seek(0)
+                            f.write(headers.as_string())
+                            f.truncate()
+
+                    # (a) Has subject without chinese characters
+                    else:
+                        if subject.startswith(banner):
+                            pass
+
+                        else:
+                            new_subject = f"{banner}{subject}"
+
+                            #### Make changes to the file
+                            headers.replace_header("Subject", new_subject)
+                            f.seek(0)
+                            f.write(headers.as_string())
+                            f.truncate()
+
+                # (c) No subject
+                else:
+                    #### Make changes to the file
+                    headers.add_header("Subject", banner)
+                    f.seek(0)
+                    f.write(headers.as_string())
+                    f.truncate()
+
+            if is_new_mail:
+                new_filepath = self.rename_new_mail_based_on_size()
+            else:
+                new_filepath = self.rename_file_based_on_size()
+
+            self.filepath = new_filepath
+            return self
+
+        except Exception as e:
+            logger.error(e)
+
+        return self
+
+    def remove_subject_banner_if_exists(self, banner):
+        filepath = self.filepath
+
+        try:
+            with open(filepath, "r+") as f:
+                msg = email.message_from_file(f)
+
+                parser = email.parser.HeaderParser()
+                headers = parser.parsestr(msg.as_string())
+                subject = headers["Subject"]
+
+                if subject:
+                    pattern = r"=\?UTF-8\?Q\?(.*?)\?="
+                    match = re.match(pattern, subject)
+
+                    # (b) Has subject with chinese characters
+                    if match:
+                        content = match.groups()[0]
+                        decoded = quopri.decodestring(content, header=True).decode(
+                            "utf-8"
+                        )
+
+                        if decoded.startswith(banner):
+                            pass
+
+                        else:
+                            encoded = quopri.encodestring(
+                                (banner + decoded).encode("utf-8"), header=True
+                            ).decode("utf-8")
+                            new_subject = f"=?UTF-8?Q?{encoded}?="
+
+                            #### Make changes to the file
+                            headers.replace_header("Subject", new_subject)
+                            f.seek(0)
+                            f.write(headers.as_string())
+                            f.truncate()
+
+                    # (a) Has subject without chinese characters
+                    else:
+                        if subject.startswith(banner):
+                            pass
+
+                        else:
+                            new_subject = f"{banner}{subject}"
+
+                            #### Make changes to the file
+                            headers.replace_header("Subject", new_subject)
+                            f.seek(0)
+                            f.write(headers.as_string())
+                            f.truncate()
+
+                # (c) No subject
+                else:
+                    #### Make changes to the file
+                    headers.add_header("Subject", banner)
+                    f.seek(0)
+                    f.write(headers.as_string())
+                    f.truncate()
+
+        except Exception as e:
+            logger.error(e)
+
+        return self
 
 
 """
@@ -1608,9 +1769,9 @@ class MutableEmailFB(MutableEmail):
         return self
 
 
-# filepath = "/mailu/mail/cs@michaelfong.co/cur/1636532731.M640604P27060.f9db57f63506,S=1411,W=868:2,S"
-# mutable_email = MutableEmailFactory.create_mutable_email(filepath)
-# print(type(mutable_email))
+filepath = "/mailu/mail/cs@michaelfong.co/cur/1636819751.M553581P2086.f9db57f63506,S=1016,W=947:2,S"
+mutable_email = MutableEmailFactory.create_mutable_email(filepath)
+print(type(mutable_email))
 
 # mutable_email = mutable_email.add_banners(
 #     UNKNOWN_BANNER_PLAIN_TEXT, UNKNOWN_BANNER_HTML
@@ -1624,5 +1785,11 @@ class MutableEmailFB(MutableEmail):
 # print(type(mutable_email))
 # print(mutable_email.filepath)
 
+mutable_email = mutable_email.add_subject_banner("""🔴🔴""")
+print(type(mutable_email))
+print(mutable_email.filepath)
+# mutable_email = mutable_email.add_subject_banner("""[FROM 新新 SENDER] """)
+# print(type(mutable_email))
+# print(mutable_email.filepath)
 
 # %%
