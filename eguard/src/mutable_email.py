@@ -10,11 +10,12 @@ from pathlib import Path
 import re
 from shutil import copyfile
 import quopri
+import base64
 
 logger = logging.getLogger()
 
-OLD_UNKNOWN_SUBJECT_BANNER = """[FROM NEW SENDER] """
-OLD_JUNK_SUBJECT_BANNER = """[JUNK MAIL] """
+OLD_UNKNOWN_SUBJECT_BANNER = """[🟠🟠FROM NEW SENDER🟠🟠] """
+OLD_JUNK_SUBJECT_BANNER = """[🔴🔴JUNK MAIL🔴🔴] """
 OLD_UNKNOWN_BANNER_PLAIN_TEXT = """注意：
 這是首次接收到的電郵地址。除非您確保其真確性，否則請留意當中所附有的超連結，附件或銀行帳戶資料。如有疑問，請尋求技術人員的支援。
 CAUTION: 
@@ -128,7 +129,7 @@ class MutableEmail:
     def __init__(self, filepath):
         self.filepath = filepath
 
-    # Rename file based on size
+    # Rename new mail based on size, for new mail only, append :2,
     def rename_file_based_on_size(self):
         filepath = self.filepath
 
@@ -137,6 +138,13 @@ class MutableEmail:
             filename = ntpath.basename(filepath)
             new_file_size = os.stat(filepath).st_size
             new_filename = re.sub(r",S=[0-9]*,", f",S={new_file_size},", filename)
+
+            pattern = r".*?W=[0-9]*:2,"
+            match = re.match(pattern, filename)
+            ## New mail
+            if match is None:
+                new_filename += ":2,"
+
             new_filepath = os.path.join(dir, new_filename)
             os.rename(filepath, new_filepath)
             return new_filepath
@@ -145,36 +153,21 @@ class MutableEmail:
             logger.error(e)
 
         return filepath
-
-    # Rename new mail based on size, for new mail only, append :2,
-    def rename_new_mail_based_on_size(self):
-        filepath = self.filepath
-
-        try:
-            dir = ntpath.dirname(filepath)
-            filename = ntpath.basename(filepath)
-            new_file_size = os.stat(filepath).st_size
-            new_filename = re.sub(r",S=[0-9]*,", f",S={new_file_size},", filename)
-            new_filename += ":2,"
-            new_filepath = os.path.join(dir, new_filename)
-            os.rename(filepath, new_filepath)
-            return new_filepath
-
-        except Exception as e:
-            logger.error(e)
-
-        return filepath
-
-    def string_without_banner_of(self, content, banner):
-        return re.sub(banner, "", content)
 
     """
-    (a) Has subject without chinese characters
-    (b) Has subject with chinese characters
+    Don't use re.sub() because special characters have to be escaped in regex.
+    """
+
+    def string_without_banner_of(self, content, banner):
+        return content.replace(banner, "")
+
+    """
+    (a) Has subject without utf-8 characters
+    (b) Has subject with utf-8 characters
     (c) No subject
     """
 
-    def add_subject_banner(self, banner, is_new_mail=False):
+    def add_subject_banner(self, banner):
         filepath = self.filepath
 
         try:
@@ -198,25 +191,51 @@ class MutableEmail:
                 ######################
 
                 if subject:
-                    pattern = r"=\?(?:UTF-8\?Q|utf-8\?q)\?(.*?)\?="
-                    match = re.match(pattern, subject)
+                    qp_pattern = r"=\?(?:UTF-8\?Q|utf-8\?q)\?(.*?)\?="
+                    b64_pattern = r"=\?(?:UTF-8\?B|utf-8\?b)\?(.*?)\?="
+                    qp_match = re.match(qp_pattern, subject)
+                    b64_match = re.match(b64_pattern, subject)
 
-                    # (b) Has subject with chinese characters
-                    if match:
-                        content = match.groups()[0]
-                        #### THIS IS TRICKY that "=\n" is unexpectedly added and corrupts the string.
-                        #### Therefore, it has to be removed.
+                    # (b) Has subject with utf-8 characters + Is quoted-printable
+                    if qp_match:
+                        content = qp_match.groups()[0]
                         decoded = quopri.decodestring(content, header=True).decode(
                             "utf-8"
                         )
 
-                        if decoded.startswith(banner):
-                            pass
+                        #### THIS IS TRICKY that "=\n" is unexpectedly added and corrupts the string.
+                        #### Therefore, it has to be removed.
+                        encoded = (
+                            quopri.encodestring(
+                                (
+                                    banner
+                                    + self.string_without_banner_of(decoded, banner)
+                                ).encode("utf-8"),
+                                header=True,
+                            )
+                            .decode("utf-8")
+                            .replace("=\n", "")
+                        )
+                        new_subject = f"=?utf-8?q?{encoded}?="
 
-                        else:
+                        #### Make changes to the file
+                        headers.replace_header("Subject", new_subject)
+                        f.seek(0)
+                        f.write(headers.as_string())
+                        f.truncate()
+
+                    # (b) Has subject with utf-8 characters + Is base64
+                    elif b64_match:
+                        content = b64_match.groups()[0]
+                        decoded = base64.b64decode(content).decode("utf-8")
+
+                        new_decoded = banner + self.string_without_banner_of(
+                            decoded, banner
+                        )
+                        if new_decoded != decoded:
                             encoded = (
                                 quopri.encodestring(
-                                    (banner + decoded).encode("utf-8"), header=True
+                                    new_decoded.encode("utf-8"), header=True
                                 )
                                 .decode("utf-8")
                                 .replace("=\n", "")
@@ -229,7 +248,7 @@ class MutableEmail:
                             f.write(headers.as_string())
                             f.truncate()
 
-                    # (a) Has subject without chinese characters
+                    # (a) Has subject without utf-8 characters
                     else:
                         if subject.startswith(banner):
                             pass
@@ -251,10 +270,7 @@ class MutableEmail:
                     f.write(headers.as_string())
                     f.truncate()
 
-            if is_new_mail:
-                new_filepath = self.rename_new_mail_based_on_size()
-            else:
-                new_filepath = self.rename_file_based_on_size()
+            new_filepath = self.rename_file_based_on_size()
 
             self.filepath = new_filepath
             return self
@@ -275,25 +291,66 @@ class MutableEmail:
                 headers = parser.parsestr(msg.as_string())
                 subject = headers["Subject"]
 
-                if subject:
-                    pattern = r"=\?UTF-8\?Q\?(.*?)\?="
-                    match = re.match(pattern, subject)
+                #### Testing only ####
+                ######################
+                # print(new_msg.as_string())
+                dir = ntpath.dirname(ntpath.dirname(filepath))
+                filename = ntpath.basename(filepath)
+                backup_dir = os.path.join(dir, "backup")
+                backup_filepath = os.path.join(backup_dir, filename)
+                Path(backup_dir).mkdir(exist_ok=True)
+                copyfile(filepath, backup_filepath)
+                #### Testing only END ####
+                ######################
 
-                    # (b) Has subject with chinese characters
-                    if match:
-                        content = match.groups()[0]
+                if subject:
+                    qp_pattern = r"=\?(?:UTF-8\?Q|utf-8\?q)\?(.*?)\?="
+                    b64_pattern = r"=\?(?:UTF-8\?B|utf-8\?b)\?(.*?)\?="
+                    qp_match = re.match(qp_pattern, subject)
+                    b64_match = re.match(b64_pattern, subject)
+
+                    # (b) Has subject with utf-8 characters + Is quoted-printable
+                    if qp_match:
+                        content = qp_match.groups()[0]
+                        #### THIS IS TRICKY that "=\n" is unexpectedly added and corrupts the string.
+                        #### Therefore, it has to be removed.
                         decoded = quopri.decodestring(content, header=True).decode(
                             "utf-8"
                         )
 
-                        if decoded.startswith(banner):
-                            pass
+                        encoded = (
+                            quopri.encodestring(
+                                self.string_without_banner_of(decoded, banner).encode(
+                                    "utf-8"
+                                ),
+                                header=True,
+                            )
+                            .decode("utf-8")
+                            .replace("=\n", "")
+                        )
+                        new_subject = f"=?utf-8?q?{encoded}?="
 
-                        else:
-                            encoded = quopri.encodestring(
-                                (banner + decoded).encode("utf-8"), header=True
-                            ).decode("utf-8")
-                            new_subject = f"=?UTF-8?Q?{encoded}?="
+                        #### Make changes to the file
+                        headers.replace_header("Subject", new_subject)
+                        f.seek(0)
+                        f.write(headers.as_string())
+                        f.truncate()
+
+                    # (b) Has subject with utf-8 characters + Is base64
+                    elif b64_match:
+                        content = b64_match.groups()[0]
+                        decoded = base64.b64decode(content).decode("utf-8")
+
+                        new_decoded = self.string_without_banner_of(decoded, banner)
+                        if new_decoded != decoded:
+                            encoded = (
+                                quopri.encodestring(
+                                    new_decoded.encode("utf-8"), header=True
+                                )
+                                .decode("utf-8")
+                                .replace("=\n", "")
+                            )
+                            new_subject = f"=?utf-8?q?{encoded}?="
 
                             #### Make changes to the file
                             headers.replace_header("Subject", new_subject)
@@ -301,27 +358,24 @@ class MutableEmail:
                             f.write(headers.as_string())
                             f.truncate()
 
-                    # (a) Has subject without chinese characters
+                    # (a) Has subject without utf-8 characters
                     else:
-                        if subject.startswith(banner):
-                            pass
+                        new_subject = self.string_without_banner_of(subject, banner)
 
-                        else:
-                            new_subject = f"{banner}{subject}"
-
-                            #### Make changes to the file
-                            headers.replace_header("Subject", new_subject)
-                            f.seek(0)
-                            f.write(headers.as_string())
-                            f.truncate()
+                        #### Make changes to the file
+                        headers.replace_header("Subject", new_subject)
+                        f.seek(0)
+                        f.write(headers.as_string())
+                        f.truncate()
 
                 # (c) No subject
                 else:
-                    #### Make changes to the file
-                    headers.add_header("Subject", banner)
-                    f.seek(0)
-                    f.write(headers.as_string())
-                    f.truncate()
+                    pass
+
+            new_filepath = self.rename_file_based_on_size()
+
+            self.filepath = new_filepath
+            return self
 
         except Exception as e:
             logger.error(e)
@@ -337,7 +391,7 @@ class MutableEmail:
 
 
 class MutableEmailAA(MutableEmail):
-    def add_banners(self, banner_plain_text, banner_html, is_new_mail=False):
+    def add_banners(self, banner_plain_text, banner_html):
         filepath = self.filepath
 
         try:
@@ -397,10 +451,7 @@ class MutableEmailAA(MutableEmail):
                 f.write(new_msg.as_string())
                 f.truncate()
 
-            if is_new_mail:
-                new_filepath = self.rename_new_mail_based_on_size()
-            else:
-                new_filepath = self.rename_file_based_on_size()
+            new_filepath = self.rename_file_based_on_size()
 
             return MutableEmailCA(new_filepath)
 
@@ -418,7 +469,7 @@ class MutableEmailAA(MutableEmail):
 
 
 class MutableEmailBA(MutableEmail):
-    def add_banners(self, banner_plain_text, banner_html, is_new_mail=False):
+    def add_banners(self, banner_plain_text, banner_html):
         filepath = self.filepath
 
         try:
@@ -476,10 +527,7 @@ class MutableEmailBA(MutableEmail):
                 f.write(new_msg.as_string())
                 f.truncate()
 
-            if is_new_mail:
-                new_filepath = self.rename_new_mail_based_on_size()
-            else:
-                new_filepath = self.rename_file_based_on_size()
+            new_filepath = self.rename_file_based_on_size()
 
             return MutableEmailCA(new_filepath)
 
@@ -499,7 +547,7 @@ class MutableEmailBA(MutableEmail):
 
 
 class MutableEmailCA(MutableEmail):
-    def add_banners(self, banner_plain_text, banner_html, is_new_mail=False):
+    def add_banners(self, banner_plain_text, banner_html):
         filepath = self.filepath
 
         try:
@@ -563,10 +611,7 @@ class MutableEmailCA(MutableEmail):
                 f.write(new_msg.as_string())
                 f.truncate()
 
-            if is_new_mail:
-                new_filepath = self.rename_new_mail_based_on_size()
-            else:
-                new_filepath = self.rename_file_based_on_size()
+            new_filepath = self.rename_file_based_on_size()
 
             return MutableEmailCA(new_filepath)
 
@@ -653,7 +698,7 @@ class MutableEmailCA(MutableEmail):
 
 
 class MutableEmailDA(MutableEmail):
-    def add_banners(self, banner_plain_text, banner_html, is_new_mail=False):
+    def add_banners(self, banner_plain_text, banner_html):
         filepath = self.filepath
 
         try:
@@ -710,10 +755,7 @@ class MutableEmailDA(MutableEmail):
                 f.write(new_msg.as_string())
                 f.truncate()
 
-            if is_new_mail:
-                new_filepath = self.rename_new_mail_based_on_size()
-            else:
-                new_filepath = self.rename_file_based_on_size()
+            new_filepath = self.rename_file_based_on_size()
 
             return MutableEmailCA(new_filepath)
 
@@ -736,7 +778,7 @@ class MutableEmailDA(MutableEmail):
 
 
 class MutableEmailEA(MutableEmail):
-    def add_banners(self, banner_plain_text, banner_html, is_new_mail=False):
+    def add_banners(self, banner_plain_text, banner_html):
         filepath = self.filepath
 
         try:
@@ -809,10 +851,7 @@ class MutableEmailEA(MutableEmail):
                 f.write(new_msg.as_string())
                 f.truncate()
 
-            if is_new_mail:
-                new_filepath = self.rename_new_mail_based_on_size()
-            else:
-                new_filepath = self.rename_file_based_on_size()
+            new_filepath = self.rename_file_based_on_size()
 
             return MutableEmailEA(new_filepath)
 
@@ -911,7 +950,7 @@ class MutableEmailEA(MutableEmail):
 
 
 class MutableEmailFA(MutableEmail):
-    def add_banners(self, banner_plain_text, banner_html, is_new_mail=False):
+    def add_banners(self, banner_plain_text, banner_html):
         filepath = self.filepath
 
         try:
@@ -976,10 +1015,7 @@ class MutableEmailFA(MutableEmail):
                 f.write(new_msg.as_string())
                 f.truncate()
 
-            if is_new_mail:
-                new_filepath = self.rename_new_mail_based_on_size()
-            else:
-                new_filepath = self.rename_file_based_on_size()
+            new_filepath = self.rename_file_based_on_size()
 
             return MutableEmailEA(new_filepath)
 
@@ -1009,7 +1045,7 @@ class MutableEmailFA(MutableEmail):
 
 
 class MutableEmailAB(MutableEmail):
-    def add_banners(self, banner_plain_text, banner_html, is_new_mail=False):
+    def add_banners(self, banner_plain_text, banner_html):
         filepath = self.filepath
 
         try:
@@ -1081,10 +1117,7 @@ class MutableEmailAB(MutableEmail):
                 f.write(new_msg.as_string())
                 f.truncate()
 
-            if is_new_mail:
-                new_filepath = self.rename_new_mail_based_on_size()
-            else:
-                new_filepath = self.rename_file_based_on_size()
+            new_filepath = self.rename_file_based_on_size()
 
             return MutableEmailCB(new_filepath)
 
@@ -1105,7 +1138,7 @@ class MutableEmailAB(MutableEmail):
 
 
 class MutableEmailBB(MutableEmail):
-    def add_banners(self, banner_plain_text, banner_html, is_new_mail=False):
+    def add_banners(self, banner_plain_text, banner_html):
         filepath = self.filepath
 
         try:
@@ -1163,10 +1196,7 @@ class MutableEmailBB(MutableEmail):
                 f.write(new_msg.as_string())
                 f.truncate()
 
-            if is_new_mail:
-                new_filepath = self.rename_new_mail_based_on_size()
-            else:
-                new_filepath = self.rename_file_based_on_size()
+            new_filepath = self.rename_file_based_on_size()
 
             return MutableEmailCB(new_filepath)
 
@@ -1190,7 +1220,7 @@ class MutableEmailBB(MutableEmail):
 
 
 class MutableEmailCB(MutableEmail):
-    def add_banners(self, banner_plain_text, banner_html, is_new_mail=False):
+    def add_banners(self, banner_plain_text, banner_html):
         filepath = self.filepath
 
         try:
@@ -1266,10 +1296,7 @@ class MutableEmailCB(MutableEmail):
                 f.write(new_msg.as_string())
                 f.truncate()
 
-            if is_new_mail:
-                new_filepath = self.rename_new_mail_based_on_size()
-            else:
-                new_filepath = self.rename_file_based_on_size()
+            new_filepath = self.rename_file_based_on_size()
 
             return MutableEmailCB(new_filepath)
 
@@ -1372,7 +1399,7 @@ class MutableEmailCB(MutableEmail):
 
 
 class MutableEmailDB(MutableEmail):
-    def add_banners(self, banner_plain_text, banner_html, is_new_mail=False):
+    def add_banners(self, banner_plain_text, banner_html):
         filepath = self.filepath
 
         try:
@@ -1440,10 +1467,7 @@ class MutableEmailDB(MutableEmail):
                 f.write(new_msg.as_string())
                 f.truncate()
 
-            if is_new_mail:
-                new_filepath = self.rename_new_mail_based_on_size()
-            else:
-                new_filepath = self.rename_file_based_on_size()
+            new_filepath = self.rename_file_based_on_size()
 
             return MutableEmailCB(new_filepath)
 
@@ -1470,7 +1494,7 @@ class MutableEmailDB(MutableEmail):
 
 
 class MutableEmailEB(MutableEmail):
-    def add_banners(self, banner_plain_text, banner_html, is_new_mail=False):
+    def add_banners(self, banner_plain_text, banner_html):
         filepath = self.filepath
 
         try:
@@ -1558,10 +1582,7 @@ class MutableEmailEB(MutableEmail):
                 f.write(new_msg.as_string())
                 f.truncate()
 
-            if is_new_mail:
-                new_filepath = self.rename_new_mail_based_on_size()
-            else:
-                new_filepath = self.rename_file_based_on_size()
+            new_filepath = self.rename_file_based_on_size()
 
             return MutableEmailEB(new_filepath)
 
@@ -1679,7 +1700,7 @@ class MutableEmailEB(MutableEmail):
 
 
 class MutableEmailFB(MutableEmail):
-    def add_banners(self, banner_plain_text, banner_html, is_new_mail=False):
+    def add_banners(self, banner_plain_text, banner_html):
         filepath = self.filepath
 
         try:
@@ -1756,10 +1777,7 @@ class MutableEmailFB(MutableEmail):
                 f.write(new_msg.as_string())
                 f.truncate()
 
-            if is_new_mail:
-                new_filepath = self.rename_new_mail_based_on_size()
-            else:
-                new_filepath = self.rename_file_based_on_size()
+            new_filepath = self.rename_file_based_on_size()
 
             return MutableEmailEB(new_filepath)
 
@@ -1769,7 +1787,7 @@ class MutableEmailFB(MutableEmail):
         return self
 
 
-filepath = "/mailu/mail/cs@michaelfong.co/cur/1636819751.M553581P2086.f9db57f63506,S=1016,W=947:2,S"
+filepath = "/mailu/mail/cs@michaelfong.co/cur/1636819751.M553581P2086.f9db57f63506,S=947,W=947:2,S"
 mutable_email = MutableEmailFactory.create_mutable_email(filepath)
 print(type(mutable_email))
 
@@ -1785,10 +1803,11 @@ print(type(mutable_email))
 # print(type(mutable_email))
 # print(mutable_email.filepath)
 
-mutable_email = mutable_email.add_subject_banner("""🔴🔴""")
-print(type(mutable_email))
-print(mutable_email.filepath)
-# mutable_email = mutable_email.add_subject_banner("""[FROM 新新 SENDER] """)
+# mutable_email = mutable_email.add_subject_banner(UNKNOWN_SUBJECT_BANNER)
+# print(type(mutable_email))
+# print(mutable_email.filepath)
+
+# mutable_email = mutable_email.remove_subject_banner_if_exists(UNKNOWN_SUBJECT_BANNER)
 # print(type(mutable_email))
 # print(mutable_email.filepath)
 
