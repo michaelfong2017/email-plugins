@@ -60,11 +60,6 @@ class MutableEmailFactory:
                                 return MutableEmailDB(filepath)
                             elif (
                                 part.get_content_type() == "text/plain"
-                                and part.get_content_charset() is None
-                            ):
-                                return MutableEmailBB(filepath)
-                            elif (
-                                part.get_content_type() == "text/plain"
                                 and part.get_content_charset() is not None
                             ):
                                 return MutableEmailAB(filepath)
@@ -72,7 +67,7 @@ class MutableEmailFactory:
                                 has_alternative = True
                                 continue
                             else:
-                                logger.error("Unexpected structure!")
+                                return MutableEmailBB(filepath)
                         else:
                             if part.get_content_type() == "multipart/related":
                                 return MutableEmailFA(filepath)
@@ -825,7 +820,7 @@ class MutableEmailFA(MutableEmail):
             else:
                 new_filepath = self.rename_file_based_on_size()
 
-            return MutableEmailCA(new_filepath)
+            return MutableEmailEA(new_filepath)
 
         except Exception as e:
             logger.error(e)
@@ -1115,7 +1110,7 @@ class MutableEmailCB(MutableEmail):
             else:
                 new_filepath = self.rename_file_based_on_size()
 
-            return MutableEmailCA(new_filepath)
+            return MutableEmailCB(new_filepath)
 
         except Exception as e:
             logger.error(e)
@@ -1131,7 +1126,9 @@ class MutableEmailCB(MutableEmail):
                 # Whole email message including both headers and content.
                 msg = email.message_from_file(f, policy=policy.default)
 
-                new_msg = MIMEMultipart("alternative")
+                new_msg = MIMEMultipart("mixed")
+                alternative = MIMEMultipart("alternative")
+                is_alternative_attached = False
 
                 # Exclude "Content-Type" and "MIME-Version" because MIMEMultipart('alternative') already contains them.
                 # Exclude "Content-Transfer-Encoding" because 'alternative' does not have this but plain text email has this.
@@ -1146,10 +1143,13 @@ class MutableEmailCB(MutableEmail):
                     new_msg[k] = v
 
                 for part in msg.walk():
-                    if part.get_content_maintype() == "text":
+                    if (
+                        part.get_content_maintype() == "text"
+                        and part.get_content_disposition() != "attachment"
+                    ):
                         content = part.get_payload(decode=True).decode("utf-8")
                         if part.get_content_subtype() == "plain":
-                            new_msg.attach(
+                            alternative.attach(
                                 MIMEText(
                                     self.string_without_banner_of(
                                         content, banner_plain_text
@@ -1159,12 +1159,19 @@ class MutableEmailCB(MutableEmail):
                             )
 
                         elif part.get_content_subtype() == "html":
-                            new_msg.attach(
+                            alternative.attach(
                                 MIMEText(
                                     self.string_without_banner_of(content, banner_html),
                                     "html",
                                 )
                             )
+
+                    elif part.get_content_disposition() == "attachment":
+                        if not is_alternative_attached:
+                            is_alternative_attached = True
+                            new_msg.attach(alternative)
+
+                        new_msg.attach(part)
 
                 #### Testing only ####
                 ######################
@@ -1184,7 +1191,7 @@ class MutableEmailCB(MutableEmail):
 
             new_filepath = self.rename_file_based_on_size()
 
-            return MutableEmailCA(new_filepath)
+            return MutableEmailCB(new_filepath)
 
         except Exception as e:
             logger.error(e)
@@ -1213,7 +1220,9 @@ class MutableEmailDB(MutableEmail):
                 # Whole email message including both headers and content.
                 msg = email.message_from_file(f, policy=policy.default)
 
-                new_msg = MIMEMultipart("alternative")
+                new_msg = MIMEMultipart("mixed")
+                alternative = MIMEMultipart("alternative")
+                is_alternative_attached = False
 
                 # Exclude "Content-Type" and "MIME-Version" because MIMEMultipart('alternative') already contains them.
                 # Exclude "Content-Transfer-Encoding" because 'alternative' does not have this but plain text email has this.
@@ -1228,22 +1237,31 @@ class MutableEmailDB(MutableEmail):
                     new_msg[k] = v
 
                 for part in msg.walk():
-                    assert part.get_content_type() == "text/html"
+                    if (
+                        part.get_content_type() == "text/html"
+                        and part.get_content_disposition() != "attachment"
+                    ):
+                        alternative.attach(
+                            MIMEText(
+                                banner_plain_text,
+                                "plain",
+                            )
+                        )
+                        #### To make the mails consistent, I use the self.default_html
+                        # and neglect the current default html.
+                        alternative.attach(
+                            MIMEText(
+                                banner_html + self.default_html,
+                                "html",
+                            )
+                        )
 
-                    new_msg.attach(
-                        MIMEText(
-                            banner_plain_text,
-                            "plain",
-                        )
-                    )
-                    #### To make the mails consistent, I use the self.default_html
-                    # and neglect the current default html.
-                    new_msg.attach(
-                        MIMEText(
-                            banner_html + self.default_html,
-                            "html",
-                        )
-                    )
+                    elif part.get_content_disposition() == "attachment":
+                        if not is_alternative_attached:
+                            is_alternative_attached = True
+                            new_msg.attach(alternative)
+
+                        new_msg.attach(part)
 
                 #### Testing only ####
                 ######################
@@ -1266,7 +1284,7 @@ class MutableEmailDB(MutableEmail):
             else:
                 new_filepath = self.rename_file_based_on_size()
 
-            return MutableEmailCA(new_filepath)
+            return MutableEmailCB(new_filepath)
 
         except Exception as e:
             logger.error(e)
@@ -1300,7 +1318,9 @@ class MutableEmailEB(MutableEmail):
                 # Whole email message including both headers and content.
                 msg = email.message_from_file(f, policy=policy.default)
 
-                new_msg = MIMEMultipart("alternative")
+                new_msg = MIMEMultipart("mixed")
+                alternative = MIMEMultipart("alternative")
+                is_alternative_attached = False
 
                 # Exclude "Content-Type" and "MIME-Version" because MIMEMultipart('alternative') already contains them.
                 # Exclude "Content-Transfer-Encoding" because 'alternative' does not have this but plain text email has this.
@@ -1316,10 +1336,13 @@ class MutableEmailEB(MutableEmail):
 
                 related = None
                 for part in msg.walk():
-                    if part.get_content_maintype() == "text":
+                    if (
+                        part.get_content_maintype() == "text"
+                        and part.get_content_disposition() != "attachment"
+                    ):
                         content = part.get_payload(decode=True).decode("utf-8")
                         if part.get_content_subtype() == "plain":
-                            new_msg.attach(
+                            alternative.attach(
                                 MIMEText(
                                     banner_plain_text
                                     + self.string_without_banner_of(
@@ -1329,7 +1352,10 @@ class MutableEmailEB(MutableEmail):
                                 )
                             )
 
-                        elif part.get_content_subtype() == "html":
+                        elif (
+                            part.get_content_subtype() == "html"
+                            and part.get_content_disposition() != "attachment"
+                        ):
                             related = MIMEMultipart("related")
                             related.attach(
                                 MIMEText(
@@ -1345,8 +1371,15 @@ class MutableEmailEB(MutableEmail):
                         assert related != None
                         related.attach(part)
 
-                assert related != None
-                new_msg.attach(related)
+                    elif part.get_content_disposition() == "attachment":
+                        if not is_alternative_attached:
+                            is_alternative_attached = True
+
+                            assert related != None
+                            alternative.attach(related)
+                            new_msg.attach(alternative)
+
+                        new_msg.attach(part)
 
                 #### Testing only ####
                 ######################
@@ -1369,7 +1402,7 @@ class MutableEmailEB(MutableEmail):
             else:
                 new_filepath = self.rename_file_based_on_size()
 
-            return MutableEmailEA(new_filepath)
+            return MutableEmailEB(new_filepath)
 
         except Exception as e:
             logger.error(e)
@@ -1385,7 +1418,9 @@ class MutableEmailEB(MutableEmail):
                 # Whole email message including both headers and content.
                 msg = email.message_from_file(f, policy=policy.default)
 
-                new_msg = MIMEMultipart("alternative")
+                new_msg = MIMEMultipart("mixed")
+                alternative = MIMEMultipart("alternative")
+                is_alternative_attached = False
 
                 # Exclude "Content-Type" and "MIME-Version" because MIMEMultipart('alternative') already contains them.
                 # Exclude "Content-Transfer-Encoding" because 'alternative' does not have this but plain text email has this.
@@ -1401,10 +1436,13 @@ class MutableEmailEB(MutableEmail):
 
                 related = None
                 for part in msg.walk():
-                    if part.get_content_maintype() == "text":
+                    if (
+                        part.get_content_maintype() == "text"
+                        and part.get_content_disposition() != "attachment"
+                    ):
                         content = part.get_payload(decode=True).decode("utf-8")
                         if part.get_content_subtype() == "plain":
-                            new_msg.attach(
+                            alternative.attach(
                                 MIMEText(
                                     self.string_without_banner_of(
                                         content, banner_plain_text
@@ -1413,7 +1451,10 @@ class MutableEmailEB(MutableEmail):
                                 )
                             )
 
-                        elif part.get_content_subtype() == "html":
+                        elif (
+                            part.get_content_subtype() == "html"
+                            and part.get_content_disposition() != "attachment"
+                        ):
                             related = MIMEMultipart("related")
                             related.attach(
                                 MIMEText(
@@ -1426,8 +1467,15 @@ class MutableEmailEB(MutableEmail):
                         assert related != None
                         related.attach(part)
 
-                assert related != None
-                new_msg.attach(related)
+                    elif part.get_content_disposition() == "attachment":
+                        if not is_alternative_attached:
+                            is_alternative_attached = True
+
+                            assert related != None
+                            alternative.attach(related)
+                            new_msg.attach(alternative)
+
+                        new_msg.attach(part)
 
                 #### Testing only ####
                 ######################
@@ -1447,7 +1495,7 @@ class MutableEmailEB(MutableEmail):
 
             new_filepath = self.rename_file_based_on_size()
 
-            return MutableEmailEA(new_filepath)
+            return MutableEmailEB(new_filepath)
 
         except Exception as e:
             logger.error(e)
@@ -1479,7 +1527,9 @@ class MutableEmailFB(MutableEmail):
                 # Whole email message including both headers and content.
                 msg = email.message_from_file(f, policy=policy.default)
 
-                new_msg = MIMEMultipart("alternative")
+                new_msg = MIMEMultipart("mixed")
+                alternative = MIMEMultipart("alternative")
+                is_alternative_attached = False
 
                 # Exclude "Content-Type" and "MIME-Version" because MIMEMultipart('alternative') already contains them.
                 # Exclude "Content-Transfer-Encoding" because 'alternative' does not have this but plain text email has this.
@@ -1493,7 +1543,7 @@ class MutableEmailFB(MutableEmail):
                 for k, v in headers:
                     new_msg[k] = v
 
-                new_msg.attach(
+                alternative.attach(
                     MIMEText(
                         banner_plain_text,
                         "plain",
@@ -1501,7 +1551,10 @@ class MutableEmailFB(MutableEmail):
                 )
                 related = None
                 for part in msg.walk():
-                    if part.get_content_type() == "text/html":
+                    if (
+                        part.get_content_type() == "text/html"
+                        and part.get_content_disposition() != "attachment"
+                    ):
                         content = part.get_payload(decode=True).decode("utf-8")
                         related = MIMEMultipart("related")
                         related.attach(
@@ -1516,8 +1569,15 @@ class MutableEmailFB(MutableEmail):
                         assert related != None
                         related.attach(part)
 
-                assert related != None
-                new_msg.attach(related)
+                    elif part.get_content_disposition() == "attachment":
+                        if not is_alternative_attached:
+                            is_alternative_attached = True
+
+                            assert related != None
+                            alternative.attach(related)
+                            new_msg.attach(alternative)
+
+                        new_msg.attach(part)
 
                 #### Testing only ####
                 ######################
@@ -1540,7 +1600,7 @@ class MutableEmailFB(MutableEmail):
             else:
                 new_filepath = self.rename_file_based_on_size()
 
-            return MutableEmailCA(new_filepath)
+            return MutableEmailEB(new_filepath)
 
         except Exception as e:
             logger.error(e)
@@ -1548,15 +1608,15 @@ class MutableEmailFB(MutableEmail):
         return self
 
 
-filepath = "/mailu/mail/cs@michaelfong.co/cur/1636097029.M531700P6644.f9db57f63506,S=997175,W=1010168:2,S"
-mutable_email = MutableEmailFactory.create_mutable_email(filepath)
-print(type(mutable_email))
+# filepath = "/mailu/mail/cs@michaelfong.co/cur/1636532731.M640604P27060.f9db57f63506,S=1411,W=868:2,S"
+# mutable_email = MutableEmailFactory.create_mutable_email(filepath)
+# print(type(mutable_email))
 
-mutable_email = mutable_email.add_banners(
-    UNKNOWN_BANNER_PLAIN_TEXT, UNKNOWN_BANNER_HTML
-)
-print(type(mutable_email))
-print(mutable_email.filepath)
+# mutable_email = mutable_email.add_banners(
+#     UNKNOWN_BANNER_PLAIN_TEXT, UNKNOWN_BANNER_HTML
+# )
+# print(type(mutable_email))
+# print(mutable_email.filepath)
 
 # mutable_email = mutable_email.remove_banners_if_exist(
 #     OLD_UNKNOWN_BANNER_PLAIN_TEXT, OLD_UNKNOWN_BANNER_HTML
