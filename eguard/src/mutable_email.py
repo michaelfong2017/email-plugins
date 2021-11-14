@@ -109,7 +109,7 @@ class MutableEmailFactory:
         except Exception as e:
             logger.error(e)
 
-        return MutableEmailAA(filepath)
+        return None
 
 
 class MutableEmail:
@@ -417,7 +417,15 @@ class MutableEmailAA(MutableEmail):
                 for part in msg.walk():
                     assert part.get_content_type() == "text/plain"
 
-                    content = part.get_payload(decode=True).decode("utf-8")
+                    ## Have to rely on the decode=True optional flag of get_payload().
+                    if (
+                        part["Content-Transfer-Encoding"] == "quoted-printable"
+                        or part["Content-Transfer-Encoding"] == "base64"
+                    ):
+                        content = part.get_payload(decode=True).decode("utf-8")
+                    else:
+                        content = part.get_payload()
+
                     new_msg.attach(
                         MIMEText(
                             banner_plain_text
@@ -495,7 +503,15 @@ class MutableEmailBA(MutableEmail):
                 for part in msg.walk():
                     assert part.get_content_type() == "text/plain"
 
-                    content = part.get_payload(decode=True).decode("utf-8")
+                    ## Have to rely on the decode=True optional flag of get_payload().
+                    if (
+                        part["Content-Transfer-Encoding"] == "quoted-printable"
+                        or part["Content-Transfer-Encoding"] == "base64"
+                    ):
+                        content = part.get_payload(decode=True).decode("utf-8")
+                    else:
+                        content = part.get_payload()
+
                     assert content == ""
 
                     new_msg.attach(
@@ -572,7 +588,15 @@ class MutableEmailCA(MutableEmail):
 
                 for part in msg.walk():
                     if part.get_content_maintype() == "text":
-                        content = part.get_payload(decode=True).decode("utf-8")
+                        ## Have to rely on the decode=True optional flag of get_payload().
+                        if (
+                            part["Content-Transfer-Encoding"] == "quoted-printable"
+                            or part["Content-Transfer-Encoding"] == "base64"
+                        ):
+                            content = part.get_payload(decode=True).decode("utf-8")
+                        else:
+                            content = part.get_payload()
+
                         if part.get_content_subtype() == "plain":
                             new_msg.attach(
                                 MIMEText(
@@ -645,7 +669,15 @@ class MutableEmailCA(MutableEmail):
 
                 for part in msg.walk():
                     if part.get_content_maintype() == "text":
-                        content = part.get_payload(decode=True).decode("utf-8")
+                        ## Have to rely on the decode=True optional flag of get_payload().
+                        if (
+                            part["Content-Transfer-Encoding"] == "quoted-printable"
+                            or part["Content-Transfer-Encoding"] == "base64"
+                        ):
+                            content = part.get_payload(decode=True).decode("utf-8")
+                        else:
+                            content = part.get_payload()
+
                         if part.get_content_subtype() == "plain":
                             new_msg.attach(
                                 MIMEText(
@@ -804,7 +836,15 @@ class MutableEmailEA(MutableEmail):
                 related = None
                 for part in msg.walk():
                     if part.get_content_maintype() == "text":
-                        content = part.get_payload(decode=True).decode("utf-8")
+                        ## Have to rely on the decode=True optional flag of get_payload().
+                        if (
+                            part["Content-Transfer-Encoding"] == "quoted-printable"
+                            or part["Content-Transfer-Encoding"] == "base64"
+                        ):
+                            content = part.get_payload(decode=True).decode("utf-8")
+                        else:
+                            content = part.get_payload()
+
                         if part.get_content_subtype() == "plain":
                             new_msg.attach(
                                 MIMEText(
@@ -886,7 +926,15 @@ class MutableEmailEA(MutableEmail):
                 related = None
                 for part in msg.walk():
                     if part.get_content_maintype() == "text":
-                        content = part.get_payload(decode=True).decode("utf-8")
+                        ## Have to rely on the decode=True optional flag of get_payload().
+                        if (
+                            part["Content-Transfer-Encoding"] == "quoted-printable"
+                            or part["Content-Transfer-Encoding"] == "base64"
+                        ):
+                            content = part.get_payload(decode=True).decode("utf-8")
+                        else:
+                            content = part.get_payload()
+
                         if part.get_content_subtype() == "plain":
                             new_msg.attach(
                                 MIMEText(
@@ -982,7 +1030,15 @@ class MutableEmailFA(MutableEmail):
                 related = None
                 for part in msg.walk():
                     if part.get_content_type() == "text/html":
-                        content = part.get_payload(decode=True).decode("utf-8")
+                        ## Have to rely on the decode=True optional flag of get_payload().
+                        if (
+                            part["Content-Transfer-Encoding"] == "quoted-printable"
+                            or part["Content-Transfer-Encoding"] == "base64"
+                        ):
+                            content = part.get_payload(decode=True).decode("utf-8")
+                        else:
+                            content = part.get_payload()
+
                         related = MIMEMultipart("related")
                         related.attach(
                             MIMEText(
@@ -1075,7 +1131,15 @@ class MutableEmailAB(MutableEmail):
                         part.get_content_type() == "text/plain"
                         and part.get_content_disposition() != "attachment"
                     ):
-                        content = part.get_payload(decode=True).decode("utf-8")
+                        ## Have to rely on the decode=True optional flag of get_payload().
+                        if (
+                            part["Content-Transfer-Encoding"] == "quoted-printable"
+                            or part["Content-Transfer-Encoding"] == "base64"
+                        ):
+                            content = part.get_payload(decode=True).decode("utf-8")
+                        else:
+                            content = part.get_payload()
+
                         alternative.attach(
                             MIMEText(
                                 banner_plain_text
@@ -1250,7 +1314,15 @@ class MutableEmailCB(MutableEmail):
                         part.get_content_maintype() == "text"
                         and part.get_content_disposition() != "attachment"
                     ):
-                        content = part.get_payload(decode=True).decode("utf-8")
+                        ## Have to rely on the decode=True optional flag of get_payload().
+                        if (
+                            part["Content-Transfer-Encoding"] == "quoted-printable"
+                            or part["Content-Transfer-Encoding"] == "base64"
+                        ):
+                            content = part.get_payload(decode=True).decode("utf-8")
+                        else:
+                            content = part.get_payload()
+
                         if part.get_content_subtype() == "plain":
                             alternative.attach(
                                 MIMEText(
@@ -1335,7 +1407,15 @@ class MutableEmailCB(MutableEmail):
                         part.get_content_maintype() == "text"
                         and part.get_content_disposition() != "attachment"
                     ):
-                        content = part.get_payload(decode=True).decode("utf-8")
+                        ## Have to rely on the decode=True optional flag of get_payload().
+                        if (
+                            part["Content-Transfer-Encoding"] == "quoted-printable"
+                            or part["Content-Transfer-Encoding"] == "base64"
+                        ):
+                            content = part.get_payload(decode=True).decode("utf-8")
+                        else:
+                            content = part.get_payload()
+
                         if part.get_content_subtype() == "plain":
                             alternative.attach(
                                 MIMEText(
@@ -1525,7 +1605,15 @@ class MutableEmailEB(MutableEmail):
                         part.get_content_maintype() == "text"
                         and part.get_content_disposition() != "attachment"
                     ):
-                        content = part.get_payload(decode=True).decode("utf-8")
+                        ## Have to rely on the decode=True optional flag of get_payload().
+                        if (
+                            part["Content-Transfer-Encoding"] == "quoted-printable"
+                            or part["Content-Transfer-Encoding"] == "base64"
+                        ):
+                            content = part.get_payload(decode=True).decode("utf-8")
+                        else:
+                            content = part.get_payload()
+
                         if part.get_content_subtype() == "plain":
                             alternative.attach(
                                 MIMEText(
@@ -1622,7 +1710,15 @@ class MutableEmailEB(MutableEmail):
                         part.get_content_maintype() == "text"
                         and part.get_content_disposition() != "attachment"
                     ):
-                        content = part.get_payload(decode=True).decode("utf-8")
+                        ## Have to rely on the decode=True optional flag of get_payload().
+                        if (
+                            part["Content-Transfer-Encoding"] == "quoted-printable"
+                            or part["Content-Transfer-Encoding"] == "base64"
+                        ):
+                            content = part.get_payload(decode=True).decode("utf-8")
+                        else:
+                            content = part.get_payload()
+
                         if part.get_content_subtype() == "plain":
                             alternative.attach(
                                 MIMEText(
@@ -1737,7 +1833,15 @@ class MutableEmailFB(MutableEmail):
                         part.get_content_type() == "text/html"
                         and part.get_content_disposition() != "attachment"
                     ):
-                        content = part.get_payload(decode=True).decode("utf-8")
+                        ## Have to rely on the decode=True optional flag of get_payload().
+                        if (
+                            part["Content-Transfer-Encoding"] == "quoted-printable"
+                            or part["Content-Transfer-Encoding"] == "base64"
+                        ):
+                            content = part.get_payload(decode=True).decode("utf-8")
+                        else:
+                            content = part.get_payload()
+
                         related = MIMEMultipart("related")
                         related.attach(
                             MIMEText(
@@ -1787,7 +1891,7 @@ class MutableEmailFB(MutableEmail):
         return self
 
 
-filepath = "/mailu/mail/cs@michaelfong.co/cur/1636819751.M553581P2086.f9db57f63506,S=947,W=947:2,S"
+filepath = "/mailu/mail/cs@michaelfong.co/cur/1636819751.M553581P2086.f9db57f63506,S=2896,W=947:2,S"
 mutable_email = MutableEmailFactory.create_mutable_email(filepath)
 print(type(mutable_email))
 
@@ -1797,11 +1901,11 @@ print(type(mutable_email))
 # print(type(mutable_email))
 # print(mutable_email.filepath)
 
-# mutable_email = mutable_email.remove_banners_if_exist(
-#     OLD_UNKNOWN_BANNER_PLAIN_TEXT, OLD_UNKNOWN_BANNER_HTML
-# )
-# print(type(mutable_email))
-# print(mutable_email.filepath)
+mutable_email = mutable_email.remove_banners_if_exist(
+    OLD_UNKNOWN_BANNER_PLAIN_TEXT, OLD_UNKNOWN_BANNER_HTML
+)
+print(type(mutable_email))
+print(mutable_email.filepath)
 
 # mutable_email = mutable_email.add_subject_banner(UNKNOWN_SUBJECT_BANNER)
 # print(type(mutable_email))
@@ -1811,4 +1915,33 @@ print(type(mutable_email))
 # print(type(mutable_email))
 # print(mutable_email.filepath)
 
+# %%
+import email
+
+filepath = "/mailu/mail/cs@michaelfong.co/cur/1636819751.M553581P2086.f9db57f63506,S=947,W=947:2,S"
+with open(filepath, "r+") as f:
+    # Get msg and headers from file for further processing
+    msg = email.message_from_file(
+        f
+    )  # Whole email message including both headers and content
+    parser = email.parser.HeaderParser()
+    headers = parser.parsestr(msg.as_string())
+
+    subject = headers["Subject"]
+    # print(subject)
+    # print("\n")
+
+    # print(headers["Content-Type"])
+    # print("\n")
+
+    for part in msg.walk():
+        ctype = part.get_content_type()
+        charset = part.get_content_charset()
+        cdispo = part.get_content_disposition()
+        cencod = part["Content-Transfer-Encoding"]
+        print(f"ctype: {ctype}")
+        print(f"charset: {charset}")
+        print(f"cdispo: {cdispo}")
+        print(f"cencod: {cencod}")
+        print(part.get_payload().replace("hi", ""))
 # %%
