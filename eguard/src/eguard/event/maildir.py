@@ -1,3 +1,5 @@
+from dependency_injector.wiring import Provide
+
 """
 For different mail directory structures, different event handler implementations are used.
 """
@@ -10,12 +12,6 @@ from watchdog.events import (
 import logging
 
 from ..mutable_email import (
-    OLD_UNKNOWN_SUBJECT_BANNER,
-    OLD_JUNK_SUBJECT_BANNER,
-    OLD_UNKNOWN_BANNER_PLAIN_TEXT,
-    OLD_UNKNOWN_BANNER_HTML,
-    OLD_JUNK_BANNER_PLAIN_TEXT,
-    OLD_JUNK_BANNER_HTML,
     UNKNOWN_SUBJECT_BANNER,
     JUNK_SUBJECT_BANNER,
     UNKNOWN_BANNER_PLAIN_TEXT,
@@ -32,7 +28,6 @@ from ..util.message_util import *
 import ntpath
 import threading
 
-RECOGNIZE_LATER_TIMER = 10.0  # seconds
 
 logger = logging.getLogger()
 
@@ -59,6 +54,8 @@ has been added/removed.
 
 
 class CurInboxEventHandler(FileSystemEventHandler):
+    RECOGNIZE_LATER_TIMER = Provide["config.time.recognize_later_timer"]  # seconds
+
     def __init__(
         self,
         user: User,
@@ -152,7 +149,7 @@ class CurInboxEventHandler(FileSystemEventHandler):
                             self.user.email, address
                         )
 
-                t = threading.Timer(RECOGNIZE_LATER_TIMER, recognize_later)
+                t = threading.Timer(self.RECOGNIZE_LATER_TIMER, recognize_later)
                 # I tested that the thread will no longer be running after the scheduled
                 # function is run.
                 t.start()

@@ -27,4 +27,6 @@ path:
   #### Assume that this relative path is consistent in all user directories.
   cur_junk_dir_from_user_dir: ".Junk/cur/"
   new_junk_dir_from_user_dir: ".Junk/new/"
-  
+
+time:
+  recognize_later_timer: 300.0
