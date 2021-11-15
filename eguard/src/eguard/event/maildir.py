@@ -9,12 +9,30 @@ from watchdog.events import (
 )
 import logging
 
+from ..mutable_email import (
+    OLD_UNKNOWN_SUBJECT_BANNER,
+    OLD_JUNK_SUBJECT_BANNER,
+    OLD_UNKNOWN_BANNER_PLAIN_TEXT,
+    OLD_UNKNOWN_BANNER_HTML,
+    OLD_JUNK_BANNER_PLAIN_TEXT,
+    OLD_JUNK_BANNER_HTML,
+    UNKNOWN_SUBJECT_BANNER,
+    JUNK_SUBJECT_BANNER,
+    UNKNOWN_BANNER_PLAIN_TEXT,
+    UNKNOWN_BANNER_HTML,
+    JUNK_BANNER_PLAIN_TEXT,
+    JUNK_BANNER_HTML,
+    MutableEmailFactory,
+)
+
 from ..models.sender_repository import SqliteSenderRepository
 from ..models.user_model import User
 from ..models.sender_repository import *
 from ..util.message_util import *
 import ntpath
 import threading
+
+RECOGNIZE_LATER_TIMER = 10.0  # seconds
 
 logger = logging.getLogger()
 
@@ -92,18 +110,20 @@ class CurInboxEventHandler(FileSystemEventHandler):
             """
             Remove all previously added banner(s), if exists.
             """
-            remove_all_banners(filepath)
+            mutable_email = MutableEmailFactory.create_mutable_email(filepath)
+            mutable_email = mutable_email.remove_all_banners()
             """"""
 
             # Insert the address to junk sender
             self.sender_repository.insert_address_to_junk_sender(address)
 
-            add_banner_to_subject(filepath, is_junk=True)
-
-            add_banner_to_body(filepath, is_junk=True)
-
-            # Rename file based on size
-            new_filename = rename_file_based_on_size(self.user.cur_inbox_dir, filename)
+            # Add banner to Subject
+            # Add banner to body
+            mutable_email = mutable_email.add_subject_banner(JUNK_SUBJECT_BANNER)
+            mutable_email = mutable_email.add_banners(
+                JUNK_BANNER_PLAIN_TEXT, JUNK_BANNER_HTML
+            )
+            new_filename = mutable_email.get_filename()
 
             # Move junk mail to junk folder
             move_to_folder(
@@ -116,48 +136,48 @@ class CurInboxEventHandler(FileSystemEventHandler):
         else:
             # If message is read ('S' for 'seen'), mark as recognized in database.
             if "S" in flags:
+
                 def recognize_later():
                     if os.path.exists(filepath):
                         """
                         Remove all previously added banner(s), if exists.
                         """
-                        remove_all_banners(filepath)
+                        mutable_email = MutableEmailFactory.create_mutable_email(
+                            filepath
+                        )
+                        mutable_email = mutable_email.remove_all_banners()
                         """"""
                         # Insert the address to known sender
                         self.sender_repository.insert_address_to_known_sender(
                             self.user.email, address
                         )
 
-                        # Rename file based on size
-                        rename_file_based_on_size(self.user.cur_inbox_dir, filename)
-
-                t = threading.Timer(10.0, recognize_later)
+                t = threading.Timer(RECOGNIZE_LATER_TIMER, recognize_later)
                 # I tested that the thread will no longer be running after the scheduled
                 # function is run.
                 t.start()
-            
+
             # If the user now marks these mails as unseen from seen, these mails' sender addresses
             # will be changed from recognized to unrecognized.
             else:
                 """
                 Remove all previously added banner(s), if exists.
                 """
-                remove_all_banners(filepath)
+                mutable_email = MutableEmailFactory.create_mutable_email(filepath)
+                mutable_email = mutable_email.remove_all_banners()
                 """"""
 
                 # Add banner to Subject
-                add_banner_to_subject(filepath, is_junk=False)
-
                 # Add banner to body
-                add_banner_to_body(filepath, is_junk=False)
+                mutable_email = mutable_email.add_subject_banner(UNKNOWN_SUBJECT_BANNER)
+                mutable_email = mutable_email.add_banners(
+                    UNKNOWN_BANNER_PLAIN_TEXT, UNKNOWN_BANNER_HTML
+                )
 
                 # Delete the address from known sender
                 self.sender_repository.delete_address_from_known_sender(
                     self.user.email, address
                 )
-
-                # Rename file based on size
-                rename_file_based_on_size(self.user.cur_inbox_dir, filename)
 
         return super().on_any_event(event)
 
@@ -211,17 +231,17 @@ class NewInboxEventHandler(FileSystemEventHandler):
                 """
                 Remove all previously added banner(s), if exists.
                 """
-                remove_all_banners(filepath)
+                mutable_email = MutableEmailFactory.create_mutable_email(filepath)
+                mutable_email = mutable_email.remove_all_banners()
                 """"""
 
-                add_banner_to_subject(filepath, is_junk=True)
-
-                add_banner_to_body(filepath, is_junk=True)
-
-                # For new mail only, append :2,
-                new_filename = rename_new_mail_based_on_size(
-                    self.user.new_inbox_dir, filename
+                # Add banner to Subject
+                # Add banner to body
+                mutable_email = mutable_email.add_subject_banner(JUNK_SUBJECT_BANNER)
+                mutable_email = mutable_email.add_banners(
+                    JUNK_BANNER_PLAIN_TEXT, JUNK_BANNER_HTML
                 )
+                new_filename = mutable_email.get_filename()
 
                 # Move junk mail to junk folder
                 move_to_folder(
@@ -236,7 +256,8 @@ class NewInboxEventHandler(FileSystemEventHandler):
                 """
                 Remove all previously added banner(s), if exists.
                 """
-                remove_all_banners(filepath)
+                mutable_email = MutableEmailFactory.create_mutable_email(filepath)
+                mutable_email = mutable_email.remove_all_banners()
                 """"""
 
                 # Add banner to Subject if record does not exist in database
@@ -246,13 +267,14 @@ class NewInboxEventHandler(FileSystemEventHandler):
                     )
                     == True
                 ):
-                    add_banner_to_subject(filepath)
-
+                    # Add banner to Subject
                     # Add banner to body
-                    add_banner_to_body(filepath, is_junk=False)
-
-                # Rename new mail based on size
-                rename_new_mail_based_on_size(self.user.new_inbox_dir, filename)
+                    mutable_email = mutable_email.add_subject_banner(
+                        UNKNOWN_SUBJECT_BANNER
+                    )
+                    mutable_email = mutable_email.add_banners(
+                        UNKNOWN_BANNER_PLAIN_TEXT, UNKNOWN_BANNER_HTML
+                    )
 
         return super().on_any_event(event)
 
@@ -286,6 +308,10 @@ For Roundcube, there are 3 ways for users to mark a mail as junk.
 
   -> ... -> <FileCreatedEvent> -> ... -> <FileMovedEvent>, all details as in (a),
   when the filename already has an 'a' flag.
+
+Exclude case: The mail is renamed and not only flags are changed, and retains in the same folder.
+This renaming is due to amending the mail instead of marking the mail as junk 
+or marking the mail as seen/unseen.
 """
 
 
@@ -306,6 +332,17 @@ class CurJunkEventHandler(FileSystemEventHandler):
         # the mail from dest_path is treated as a junk mail.
         ####
         if isinstance(event, FileMovedEvent):
+            ###################
+            ## Exclude case
+            dir_src = ntpath.dirname(event.src_path)
+            dir_dest = ntpath.dirname(event.dest_path)
+            if dir_src == dir_dest and "".join(
+                event.src_path.split(",")[:-1]
+            ) != "".join(event.dest_path.split(",")[:-1]):
+                return super().on_any_event(event)
+            ## Exclude case END
+            ###################
+
             logger.info(f"{self.user.email} ; {self} ; {event}")
 
             filepath = event.dest_path
@@ -320,15 +357,16 @@ class CurJunkEventHandler(FileSystemEventHandler):
             """
             Remove all previously added banner(s), if exists.
             """
-            remove_all_banners(filepath)
+            mutable_email = MutableEmailFactory.create_mutable_email(filepath)
+            mutable_email = mutable_email.remove_all_banners()
             """"""
 
-            add_banner_to_subject(filepath, is_junk=True)
-
-            add_banner_to_body(filepath, is_junk=True)
-
-            # Rename file based on size
-            rename_file_based_on_size(self.user.cur_junk_dir, filename)
+            # Add banner to Subject
+            # Add banner to body
+            mutable_email = mutable_email.add_subject_banner(JUNK_SUBJECT_BANNER)
+            mutable_email = mutable_email.add_banners(
+                JUNK_BANNER_PLAIN_TEXT, JUNK_BANNER_HTML
+            )
 
         elif isinstance(event, FileCreatedEvent):
             logger.info(f"{self.user.email} ; {self} ; {event}")
@@ -353,15 +391,16 @@ class CurJunkEventHandler(FileSystemEventHandler):
                 """
                 Remove all previously added banner(s), if exists.
                 """
-                remove_all_banners(filepath)
+                mutable_email = MutableEmailFactory.create_mutable_email(filepath)
+                mutable_email = mutable_email.remove_all_banners()
                 """"""
 
-                add_banner_to_subject(filepath, is_junk=True)
-
-                add_banner_to_body(filepath, is_junk=True)
-
-                # Rename file based on size
-                rename_file_based_on_size(self.user.cur_junk_dir, filename)
+                # Add banner to Subject
+                # Add banner to body
+                mutable_email = mutable_email.add_subject_banner(JUNK_SUBJECT_BANNER)
+                mutable_email = mutable_email.add_banners(
+                    JUNK_BANNER_PLAIN_TEXT, JUNK_BANNER_HTML
+                )
 
             ## Exclude case
             else:
@@ -404,17 +443,17 @@ class NewJunkEventHandler(FileSystemEventHandler):
             """
             Remove all previously added banner(s), if exists.
             """
-            remove_all_banners(filepath)
+            mutable_email = MutableEmailFactory.create_mutable_email(filepath)
+            mutable_email = mutable_email.remove_all_banners()
             """"""
 
-            add_banner_to_subject(filepath, is_junk=True)
-
-            add_banner_to_body(filepath, is_junk=True)
-
-            # For new mail only, append :2,
-            new_filename = rename_new_mail_based_on_size(
-                self.user.new_junk_dir, filename
+            # Add banner to Subject
+            # Add banner to body
+            mutable_email = mutable_email.add_subject_banner(JUNK_SUBJECT_BANNER)
+            mutable_email = mutable_email.add_banners(
+                JUNK_BANNER_PLAIN_TEXT, JUNK_BANNER_HTML
             )
+            new_filename = mutable_email.get_filename()
 
             # Move junk mail to junk folder
             move_to_folder(
