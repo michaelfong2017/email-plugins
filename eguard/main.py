@@ -16,7 +16,7 @@ def main():
     # Also ensure that an error is raised to ask for the required
     # positional argument 'command' in the case 'python3 main.py'.
     if not (len(sys.argv) > 1 and ("-h" in sys.argv or "--help" in sys.argv)):
-        parser.add_argument("command", choices={"start", "restart", "stop"})
+        parser.add_argument("command", choices={"start", "restart", "stop", "fetchandbuild"})
 
     parser.add_argument("-h", "--help", action="store_true")
     args, other = parser.parse_known_args()
@@ -75,6 +75,19 @@ def main():
 
     elif args.command == "stop":
         subprocess.Popen(["tmux", "send-keys", "C-c"])
+
+    elif args.command == "fetchandbuild":
+        subprocess.Popen(
+            [
+                "tmux",
+                "send-keys",
+                "C-c",
+                "C-m",  # This 'return' is needed because for some reason, the first character does not have effect without this.
+                "C-u",
+                f"{ENV_NAME}/bin/python -m src.{MODULE_NAME} {args.command} {(' ').join(other)}",
+                "C-m",
+            ]
+        )
 
 
 if __name__ == "__main__":

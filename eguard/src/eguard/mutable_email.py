@@ -605,11 +605,14 @@ class MutableEmailAA(MutableEmail):
                     else:
                         content = part.get_payload()
 
+                    charset = part.get_content_charset()
+
                     new_msg.attach(
                         MIMEText(
                             banner_plain_text
                             + self.string_without_banners_of(content, banner_plain_text),
                             "plain",
+                            charset,
                         )
                     )
                     new_msg.attach(
@@ -619,6 +622,7 @@ class MutableEmailAA(MutableEmail):
                                 self.string_without_banners_of(content, banner_html)
                             ),
                             "html",
+                            charset,
                         )
                     )
 
@@ -2094,4 +2098,7 @@ class MutableEmailFB(MutableEmail):
 # print(type(mutable_email))
 # print(mutable_email.filepath)
 
+filepath = "/mailu/mail/cs@michaelfong.co/cur/1637114714.M346680P9124.f9db57f63506,S=1533,W=1916:2,S"
+mutable_email = MutableEmailFactory.create_mutable_email(filepath)
+mutable_email.rename_file_based_on_size()
 # %%

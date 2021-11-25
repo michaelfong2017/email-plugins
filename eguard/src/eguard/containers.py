@@ -1,6 +1,7 @@
 from dependency_injector import containers, providers
 import os
 
+from .fetch_and_build import FetchAndBuildHelper
 from .event import maildir
 from .models.user_model import UserFactory
 from .models.sender_repository import SqliteSenderRepository
@@ -56,3 +57,10 @@ class Container(containers.DeclarativeContainer):
         sender_repository=sender_repository,
     )
     #### END ####
+
+    #### Fetch and build ####
+    fetch_and_build_helper_factory = providers.Factory(
+        FetchAndBuildHelper,
+        sender_repository=sender_repository,
+    )
+    #### Fetch and build END ####
