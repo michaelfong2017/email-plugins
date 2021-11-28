@@ -35,6 +35,15 @@ def main(
             Fetch existing unseen mail list and junk mail list to build
             the known sender list and junk sender list for every user.
 
+        If updatebanners:
+
+            Accomplish two tasks. First, add/remove banners depending on the
+            current state of the database storing the known sender list and
+            junk sender list. Second, update the wording and appearance of
+            existing banners as configured in mutable_email.py. Banners with
+            prefix OLD_ will be replaced with banners without prefix OLD_
+            correspondingly. This is applied to each email for every user.
+
 
         """,
     ),
@@ -94,3 +103,11 @@ def main(
             fetch_and_build_helper = container.fetch_and_build_helper_factory(user)
             fetch_and_build_helper.fetch_and_build_known_list()
             fetch_and_build_helper.fetch_and_build_junk_list()
+
+    elif command == "updatebanners":
+        for user_dir in container.user_dirs():
+            user = container.user_factory(user_dir)
+            update_banners_helper = container.update_banners_helper_factory(user)
+            update_banners_helper.update_unknown_banners()
+            update_banners_helper.update_junk_banners()
+            update_banners_helper.update_no_banners()

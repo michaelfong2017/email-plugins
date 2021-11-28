@@ -113,6 +113,11 @@ may have to be rechecked.
 
 <br>
 
+### Configure banners
+Currently, it is needed to configure the target banners and the old banners directly in the source code `src/eguard/mutable_email.py`. Old banners will be replaced with target banners when email status is modified or when `eguard command` is called to update banners.
+
+<br>
+
 ## Run eguard
 - When new user email is registered or a user mail directory is removed, eguard has to be restarted. Reconfiguration of user
 directory paths before restart may be needed.

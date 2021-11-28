@@ -6,16 +6,14 @@ from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
 import ntpath
 import os
-from pathlib import Path
 import re
-from shutil import copyfile
 import quopri
 import base64
 
 logger = logging.getLogger()
 
-OLD_UNKNOWN_SUBJECT_BANNER = """[FROM NEW SENDER] """
-OLD_JUNK_SUBJECT_BANNER = """[JUNK MAIL] """
+OLD_UNKNOWN_SUBJECT_BANNER = """[🟠🟠FROM NEW SENDER🟠🟠] """
+OLD_JUNK_SUBJECT_BANNER = """[🔴🔴JUNK MAIL🔴🔴] """
 OLD_UNKNOWN_BANNER_PLAIN_TEXT = """注意：
 這是首次接收到的電郵地址。除非您確保其真確性，否則請留意當中所附有的超連結，附件或銀行帳戶資料。如有疑問，請尋求技術人員的支援。
 CAUTION: 
@@ -38,8 +36,8 @@ OLD_JUNK_BANNER_HTML = """<p style="margin: 10px 20%; text-align: center; border
 ##############################
 ##############################
 
-UNKNOWN_SUBJECT_BANNER = """[🟠🟠FROM NEW SENDER🟠🟠] """
-JUNK_SUBJECT_BANNER = """[🔴🔴JUNK MAIL🔴🔴] """
+UNKNOWN_SUBJECT_BANNER = """[⚠️⚠️FROM NEW SENDER⚠️⚠️] """
+JUNK_SUBJECT_BANNER = """[❗❗JUNK MAIL❗❗] """
 UNKNOWN_BANNER_PLAIN_TEXT = OLD_UNKNOWN_BANNER_PLAIN_TEXT
 UNKNOWN_BANNER_HTML = OLD_UNKNOWN_BANNER_HTML
 JUNK_BANNER_PLAIN_TEXT = OLD_JUNK_BANNER_PLAIN_TEXT
