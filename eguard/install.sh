@@ -10,6 +10,7 @@ $env_name/bin/pip install pytz
 $env_name/bin/pip install pyyaml
 $env_name/bin/pip install watchdog
 $env_name/bin/pip install mail-parser
+$env_name/bin/pip install plone.rfc822
 $env_name/bin/pip install pytest
 
 touch config/eguard.yml

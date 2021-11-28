@@ -151,10 +151,19 @@ class MutableEmail:
         filepath = self.filepath
 
         try:
+            LF = b'\n'
+            CRLF = b'\r\n'
+
+            W_size = -1
+            with open(filepath, 'rb') as f:
+                content = f.read()
+                content = content.replace(LF, CRLF)
+                W_size = len(content)
+
             dir = ntpath.dirname(filepath)
             filename = ntpath.basename(filepath)
             new_file_size = os.stat(filepath).st_size
-            new_filename = re.sub(r",S=[0-9]*,", f",S={new_file_size},", filename)
+            new_filename = re.sub(r",S=[0-9]*,W=[0-9]*", f",S={new_file_size},W={W_size}", filename)
 
             pattern = r".*?W=[0-9]*:2,"
             match = re.match(pattern, filename)
@@ -2098,7 +2107,7 @@ class MutableEmailFB(MutableEmail):
 # print(type(mutable_email))
 # print(mutable_email.filepath)
 
-filepath = "/mailu/mail/cs@michaelfong.co/cur/1637114714.M346680P9124.f9db57f63506,S=1533,W=1916:2,S"
-mutable_email = MutableEmailFactory.create_mutable_email(filepath)
-mutable_email.rename_file_based_on_size()
+# filepath = "/mailu/mail/pc@michaelfong.co/cur/1638101280.M30799P8368.f9db57f63506,S=958,W=1016:2,S"
+# mutable_email = MutableEmailFactory.create_mutable_email(filepath)
+# mutable_email.rename_file_based_on_size()
 # %%
