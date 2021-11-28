@@ -612,11 +612,10 @@ class MutableEmailAA(MutableEmail):
                         part["Content-Transfer-Encoding"] == "quoted-printable"
                         or part["Content-Transfer-Encoding"] == "base64"
                     ):
-                        content = part.get_payload(decode=True).decode("utf-8")
+                        charset = part.get_content_charset()
+                        content = part.get_payload(decode=True).decode(charset)
                     else:
                         content = part.get_payload()
-
-                    charset = part.get_content_charset()
 
                     new_msg.attach(
                         MIMEText(
@@ -625,7 +624,6 @@ class MutableEmailAA(MutableEmail):
                                 content, banner_plain_text
                             ),
                             "plain",
-                            charset,
                         )
                     )
                     new_msg.attach(
@@ -635,7 +633,6 @@ class MutableEmailAA(MutableEmail):
                                 self.string_without_banners_of(content, banner_html)
                             ),
                             "html",
-                            charset,
                         )
                     )
 
@@ -698,17 +695,6 @@ class MutableEmailBA(MutableEmail):
 
                 for part in msg.walk():
                     assert part.get_content_type() == "text/plain"
-
-                    ## Have to rely on the decode=True optional flag of get_payload().
-                    if (
-                        part["Content-Transfer-Encoding"] == "quoted-printable"
-                        or part["Content-Transfer-Encoding"] == "base64"
-                    ):
-                        content = part.get_payload(decode=True).decode("utf-8")
-                    else:
-                        content = part.get_payload()
-
-                    assert content == ""
 
                     new_msg.attach(
                         MIMEText(
@@ -1038,7 +1024,8 @@ class MutableEmailEA(MutableEmail):
                             part["Content-Transfer-Encoding"] == "quoted-printable"
                             or part["Content-Transfer-Encoding"] == "base64"
                         ):
-                            content = part.get_payload(decode=True).decode("utf-8")
+                            charset = part.get_content_charset()
+                            content = part.get_payload(decode=True).decode(charset)
                         else:
                             content = part.get_payload()
 
@@ -1234,7 +1221,8 @@ class MutableEmailFA(MutableEmail):
                             part["Content-Transfer-Encoding"] == "quoted-printable"
                             or part["Content-Transfer-Encoding"] == "base64"
                         ):
-                            content = part.get_payload(decode=True).decode("utf-8")
+                            charset = part.get_content_charset()
+                            content = part.get_payload(decode=True).decode(charset)
                         else:
                             content = part.get_payload()
 
@@ -1335,7 +1323,8 @@ class MutableEmailAB(MutableEmail):
                             part["Content-Transfer-Encoding"] == "quoted-printable"
                             or part["Content-Transfer-Encoding"] == "base64"
                         ):
-                            content = part.get_payload(decode=True).decode("utf-8")
+                            charset = part.get_content_charset()
+                            content = part.get_payload(decode=True).decode(charset)
                         else:
                             content = part.get_payload()
 
@@ -1518,7 +1507,8 @@ class MutableEmailCB(MutableEmail):
                             part["Content-Transfer-Encoding"] == "quoted-printable"
                             or part["Content-Transfer-Encoding"] == "base64"
                         ):
-                            content = part.get_payload(decode=True).decode("utf-8")
+                            charset = part.get_content_charset()
+                            content = part.get_payload(decode=True).decode(charset)
                         else:
                             content = part.get_payload()
 
@@ -1811,7 +1801,8 @@ class MutableEmailEB(MutableEmail):
                             part["Content-Transfer-Encoding"] == "quoted-printable"
                             or part["Content-Transfer-Encoding"] == "base64"
                         ):
-                            content = part.get_payload(decode=True).decode("utf-8")
+                            charset = part.get_content_charset()
+                            content = part.get_payload(decode=True).decode(charset)
                         else:
                             content = part.get_payload()
 
@@ -2041,7 +2032,8 @@ class MutableEmailFB(MutableEmail):
                             part["Content-Transfer-Encoding"] == "quoted-printable"
                             or part["Content-Transfer-Encoding"] == "base64"
                         ):
-                            content = part.get_payload(decode=True).decode("utf-8")
+                            charset = part.get_content_charset()
+                            content = part.get_payload(decode=True).decode(charset)
                         else:
                             content = part.get_payload()
 
