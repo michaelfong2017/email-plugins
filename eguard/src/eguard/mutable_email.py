@@ -151,11 +151,11 @@ class MutableEmail:
         filepath = self.filepath
 
         try:
-            LF = b'\n'
-            CRLF = b'\r\n'
+            LF = b"\n"
+            CRLF = b"\r\n"
 
             W_size = -1
-            with open(filepath, 'rb') as f:
+            with open(filepath, "rb") as f:
                 content = f.read()
                 content = content.replace(LF, CRLF)
                 W_size = len(content)
@@ -163,7 +163,9 @@ class MutableEmail:
             dir = ntpath.dirname(filepath)
             filename = ntpath.basename(filepath)
             new_file_size = os.stat(filepath).st_size
-            new_filename = re.sub(r",S=[0-9]*,W=[0-9]*", f",S={new_file_size},W={W_size}", filename)
+            new_filename = re.sub(
+                r",S=[0-9]*,W=[0-9]*", f",S={new_file_size},W={W_size}", filename
+            )
 
             pattern = r".*?W=[0-9]*:2,"
             match = re.match(pattern, filename)
@@ -619,7 +621,9 @@ class MutableEmailAA(MutableEmail):
                     new_msg.attach(
                         MIMEText(
                             banner_plain_text
-                            + self.string_without_banners_of(content, banner_plain_text),
+                            + self.string_without_banners_of(
+                                content, banner_plain_text
+                            ),
                             "plain",
                             charset,
                         )
@@ -785,31 +789,62 @@ class MutableEmailCA(MutableEmail):
                             part["Content-Transfer-Encoding"] == "quoted-printable"
                             or part["Content-Transfer-Encoding"] == "base64"
                         ):
-                            content = part.get_payload(decode=True).decode("utf-8")
+                            charset = part.get_content_charset()
+
+                            #### quoted-printable -> bytes in that charset -> string
+                            content = part.get_payload(decode=True).decode(charset)
+
+                            #### bytes in utf-8
+                            encoded_as_bytes = banner_html.encode(
+                                "utf-8"
+                            ) + self.string_without_banners_of(
+                                content, banner_html
+                            ).encode(
+                                "utf-8"
+                            )
+
+                            new_content = encoded_as_bytes.decode("utf-8")
+
+                            if part.get_content_subtype() == "plain":
+                                new_msg.attach(
+                                    MIMEText(
+                                        new_content,
+                                        "plain",
+                                    )
+                                )
+
+                            elif part.get_content_subtype() == "html":
+                                new_msg.attach(
+                                    MIMEText(
+                                        new_content,
+                                        "html",
+                                    )
+                                )
+
                         else:
                             content = part.get_payload()
 
-                        if part.get_content_subtype() == "plain":
-                            new_msg.attach(
-                                MIMEText(
-                                    banner_plain_text
-                                    + self.string_without_banners_of(
-                                        content, banner_plain_text
-                                    ),
-                                    "plain",
+                            if part.get_content_subtype() == "plain":
+                                new_msg.attach(
+                                    MIMEText(
+                                        banner_plain_text
+                                        + self.string_without_banners_of(
+                                            content, banner_plain_text
+                                        ),
+                                        "plain",
+                                    )
                                 )
-                            )
 
-                        elif part.get_content_subtype() == "html":
-                            new_msg.attach(
-                                MIMEText(
-                                    banner_html
-                                    + self.string_without_banners_of(
-                                        content, banner_html
-                                    ),
-                                    "html",
+                            elif part.get_content_subtype() == "html":
+                                new_msg.attach(
+                                    MIMEText(
+                                        banner_html
+                                        + self.string_without_banners_of(
+                                            content, banner_html
+                                        ),
+                                        "html",
+                                    )
                                 )
-                            )
 
                 #### Testing only ####
                 ######################
@@ -883,7 +918,9 @@ class MutableEmailCA(MutableEmail):
                         elif part.get_content_subtype() == "html":
                             new_msg.attach(
                                 MIMEText(
-                                    self.string_without_banners_of(content, banner_html),
+                                    self.string_without_banners_of(
+                                        content, banner_html
+                                    ),
                                     "html",
                                 )
                             )
@@ -1141,7 +1178,9 @@ class MutableEmailEA(MutableEmail):
                             related = MIMEMultipart("related")
                             related.attach(
                                 MIMEText(
-                                    self.string_without_banners_of(content, banner_html),
+                                    self.string_without_banners_of(
+                                        content, banner_html
+                                    ),
                                     "html",
                                 )
                             )
@@ -1621,7 +1660,9 @@ class MutableEmailCB(MutableEmail):
                         elif part.get_content_subtype() == "html":
                             alternative.attach(
                                 MIMEText(
-                                    self.string_without_banners_of(content, banner_html),
+                                    self.string_without_banners_of(
+                                        content, banner_html
+                                    ),
                                     "html",
                                 )
                             )
@@ -1928,7 +1969,9 @@ class MutableEmailEB(MutableEmail):
                             related = MIMEMultipart("related")
                             related.attach(
                                 MIMEText(
-                                    self.string_without_banners_of(content, banner_html),
+                                    self.string_without_banners_of(
+                                        content, banner_html
+                                    ),
                                     "html",
                                 )
                             )
@@ -2107,7 +2150,20 @@ class MutableEmailFB(MutableEmail):
 # print(type(mutable_email))
 # print(mutable_email.filepath)
 
-# filepath = "/mailu/mail/pc@michaelfong.co/cur/1638101280.M30799P8368.f9db57f63506,S=958,W=1016:2,S"
-# mutable_email = MutableEmailFactory.create_mutable_email(filepath)
+filepath = "/mailu/mail/pc@michaelfong.co/cur/1638100587.M305640P8061.f9db57f63506,S=1502,W=1538:2,S"
+mutable_email = MutableEmailFactory.create_mutable_email(filepath)
+mutable_email = mutable_email.add_banners(
+    UNKNOWN_BANNER_PLAIN_TEXT, UNKNOWN_BANNER_HTML
+)
 # mutable_email.rename_file_based_on_size()
+print(mutable_email)
+
+
+# filepath = "/mailu/mail/pc@michaelfong.co/cur/1638116225.M828741P14295.f9db57f63506,S=1477,W=1513:2,S"
+# mutable_email = MutableEmailFactory.create_mutable_email(filepath)
+# # mutable_email.rename_file_based_on_size()
+# mutable_email = mutable_email.add_banners(
+#     UNKNOWN_BANNER_PLAIN_TEXT, UNKNOWN_BANNER_HTML
+# )
+# print(mutable_email)
 # %%
