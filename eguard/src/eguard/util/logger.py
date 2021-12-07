@@ -11,7 +11,7 @@ def create_logger(debug=False):
     if debug:
         logger.setLevel(logging.DEBUG)
     else:
-        logger.setLevel(logging.ERROR)
+        logger.setLevel(logging.WARNING)
 
     if not len(logger.handlers) == 0:
         logger.handlers.clear()

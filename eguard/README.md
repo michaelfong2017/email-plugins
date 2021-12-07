@@ -116,6 +116,43 @@ may have to be rechecked.
 ### Configure banners
 Currently, it is needed to configure the target banners and the old banners directly in the source code `src/eguard/mutable_email.py`. Old banners will be replaced with target banners when email status is modified or when `eguard command` is called to update banners.
 
+#### Example 1
+For example, assume that below is a snippet of mutable_email.py.
+
+```python
+OLD_UNKNOWN_SUBJECT_BANNER = """[🟠🟠FROM NEW SENDER🟠🟠] """
+UNKNOWN_SUBJECT_BANNER = OLD_UNKNOWN_SUBJECT_BANNER
+```
+
+In order to change the banner wording, one can change as follows.
+
+```python
+OLD_UNKNOWN_SUBJECT_BANNER = """[🟠🟠FROM NEW SENDER🟠🟠] """
+UNKNOWN_SUBJECT_BANNER = """[⚠️⚠️FROM NEW SENDER⚠️⚠️] """
+```
+
+#### Example 2
+For example, assume that below is a snippet of mutable_email.py.
+
+```python
+OLD_UNKNOWN_SUBJECT_BANNER = """[🟠🟠FROM NEW SENDER🟠🟠] """
+UNKNOWN_SUBJECT_BANNER = """[⚠️⚠️FROM NEW SENDER⚠️⚠️] 
+```
+
+In order to change the banner wording, one should first run the eguard `updatebanners` command to ensure that `"""[🟠🟠FROM NEW SENDER🟠🟠] """` does not exist anymore in all emails of all users, before amending mutable_email.py.
+
+1. 
+```bash
+python3 main.py updatebanners
+
+```
+
+2. Then, amend mutable_email.py as in Example 1.
+```python
+OLD_UNKNOWN_SUBJECT_BANNER = """[⚠️⚠️FROM NEW SENDER⚠️⚠️] """
+UNKNOWN_SUBJECT_BANNER = """[❗❗FROM NEW SENDER❗❗] """
+```
+
 <br>
 
 ## Run eguard
@@ -137,6 +174,22 @@ python3 main.py restart
 ### Stop eguard
 ```bash
 python3 main.py stop
+
+```
+
+### Fetch and build known sender lists and junk list
+Fetch existing unseen mail directory and junk mail directory of every user to build a known sender list for every user and build a common junk sender list for all users. This does not remove any existing records in the known sender lists and the junk sender list, if exist.
+
+```bash
+python3 main.py fetchandbuild
+
+```
+
+### Update all email banners (add, remove and replace)
+Accomplish two tasks. First, add/remove banners depending on the current state of the database storing the known sender lists and the junk sender list. Second, update the wording and appearance of existing banners as configured in mutable_email.py. Banners with prefix OLD_ will be replaced with banners without prefix OLD_ correspondingly. This is applied to each email for every user.
+
+```bash
+python3 main.py updatebanners
 
 ```
 
@@ -167,13 +220,13 @@ python3 main.py restart --debug
 Eguard is designed to run inside a tmux session which is automatically created.
 Sometimes it can be convenient to attach to it and inspect.
 
-To list all tmux sessions in the host machine:
+### To list all tmux sessions in the host machine
 ```bash
 tmux list-sessions
 ```
 - A tmux session named 'eguard' should be found if eguard is run correctly.
 
-To attach to a tmux session:
+### To attach to a tmux session
 
 implicitly,
 ```bash
@@ -187,8 +240,11 @@ explicitly,
 tmux attach -t eguard
 ```
 
-To detach from a tmux session:
-Press Ctrl + B (for mac: ^ + B), release both keys and then press D.
+### To detach from a tmux session
+Press Ctrl-B (for mac: ^-B), release both keys and then press D.
+
+### To go back to view the lines of text which have scrolled off the screen
+The solution is to use tmux specific controls to access its own scrollback buffer: Press Ctrl-B, then [ to enter copy mode, use Down/Up arrows or PageDown and PageUp keys, q or Enter to exit copy mode.
 
 ## Working with eguard database
 Admin should connect to eguard.db inside this directory to create, read, update and delete

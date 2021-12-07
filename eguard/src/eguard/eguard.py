@@ -5,6 +5,7 @@ from .util.logger import create_logger
 from .containers import Container
 from watchdog.observers import Observer
 import time
+import os
 
 #### Dependency injector: import modules to be wired with the container.
 from .event import maildir
@@ -32,8 +33,10 @@ def main(
 
         If fetchandbuild:
 
-            Fetch existing unseen mail list and junk mail list to build
-            the known sender list and junk sender list for every user.
+            Fetch existing unseen mail directory and junk mail directory of every user
+            to build a known sender list for every user and build a common junk
+            sender list for all users. This does not remove any existing records in
+            the known sender lists and the junk sender list, if exist.
 
         If updatebanners:
 
@@ -76,18 +79,38 @@ def main(
         observer = Observer()
         for user_dir in container.user_dirs():
             user = container.user_factory(user_dir)
-            event_handler = container.cur_inbox_event_handler_factory(user)
-            observer.schedule(event_handler, user.cur_inbox_dir, recursive=True)
-            event_handler = container.new_inbox_event_handler_factory(user)
-            observer.schedule(event_handler, user.new_inbox_dir, recursive=True)
-            event_handler = container.cur_junk_event_handler_factory(user)
-            observer.schedule(event_handler, user.cur_junk_dir, recursive=True)
-            event_handler = container.new_junk_event_handler_factory(user)
-            observer.schedule(event_handler, user.new_junk_dir, recursive=True)
+
+            if os.path.isdir(user.cur_inbox_dir):
+                event_handler = container.cur_inbox_event_handler_factory(user)
+                observer.schedule(event_handler, user.cur_inbox_dir, recursive=True)
+            else:
+                logger.warning(f"Directory \"{user.cur_inbox_dir}\" does not exist.")
+
+            if os.path.isdir(user.new_inbox_dir):
+                event_handler = container.new_inbox_event_handler_factory(user)
+                observer.schedule(event_handler, user.new_inbox_dir, recursive=True)
+            else:
+                logger.warning(f"Directory \"{user.new_inbox_dir}\" does not exist.")
+
+            if os.path.isdir(user.cur_junk_dir):
+                event_handler = container.cur_junk_event_handler_factory(user)
+                observer.schedule(event_handler, user.cur_junk_dir, recursive=True)
+            else:
+                logger.warning(f"Directory \"{user.cur_junk_dir}\" does not exist.")
+
+            if os.path.isdir(user.new_junk_dir):
+                event_handler = container.new_junk_event_handler_factory(user)
+                observer.schedule(event_handler, user.new_junk_dir, recursive=True)
+            else:
+                logger.warning(f"Directory \"{user.new_junk_dir}\" does not exist.")
+
 
             if monitor_user_dir:
-                event_handler = container.user_dir_event_handler_factory(user)
-                observer.schedule(event_handler, user_dir, recursive=False)
+                if os.path.isdir(user_dir):
+                    event_handler = container.user_dir_event_handler_factory(user)
+                    observer.schedule(event_handler, user_dir, recursive=False)
+                else:
+                    logger.warning(f"Directory \"{user_dir}\" does not exist.")
 
         observer.start()
         try:
@@ -98,6 +121,7 @@ def main(
             observer.join()
 
     elif command == "fetchandbuild":
+        print(container.user_dirs())
         for user_dir in container.user_dirs():
             user = container.user_factory(user_dir)
             fetch_and_build_helper = container.fetch_and_build_helper_factory(user)
@@ -107,7 +131,11 @@ def main(
     elif command == "updatebanners":
         for user_dir in container.user_dirs():
             user = container.user_factory(user_dir)
-            update_banners_helper = container.update_banners_helper_factory(user)
-            update_banners_helper.update_unknown_banners()
-            update_banners_helper.update_junk_banners()
-            update_banners_helper.update_no_banners()
+
+            if os.path.isdir(user.cur_inbox_dir) and os.path.isdir(user.cur_junk_dir):
+                update_banners_helper = container.update_banners_helper_factory(user)
+                update_banners_helper.update_unknown_banners()
+                update_banners_helper.update_junk_banners()
+                update_banners_helper.update_no_banners()
+            else:
+                logger.warning(f"At least one of the directories \"{user.cur_inbox_dir}\" and \"{user.cur_junk_dir}\" does not exist. Ignore user \"{user.email}\" during {command}.")
