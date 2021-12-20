@@ -20,7 +20,7 @@ class SqliteSenderRepository:
                 logger.info(f"{self}: connect db now.")
                 self.conn = sqlite3.connect(
                     os.path.join(os.path.abspath("."), "data/eguard.db"),
-                    check_same_thread=False
+                    check_same_thread=False,
                 )
                 self.conn_time = datetime.datetime.now()
 
@@ -28,7 +28,7 @@ class SqliteSenderRepository:
             logger.info(f"{self}: connect db now.")
             self.conn = sqlite3.connect(
                 os.path.join(os.path.abspath("."), "data/eguard.db"),
-                check_same_thread=False
+                check_same_thread=False,
             )
             self.conn_time = datetime.datetime.now()
 
@@ -102,6 +102,20 @@ class SqliteSenderRepository:
             logger.error(f"{e} in CHECK KNOWN operation for address {address}")
             return None
 
+    # Select addresses from known sender
+    ## Return a set
+    def select_addresses_from_known_sender(self, user_email):
+        self.connect_db_if_not()
+
+        try:
+            cursor = self.conn.execute(f"""SELECT * FROM `{user_email}_known_sender`""")
+            records = cursor.fetchall()
+            return set(record[0] for record in records)
+
+        except Exception as e:
+            # logging.getLogger("stat").error(e)
+            return set()
+
     # Insert the address to junk sender
     def insert_address_to_junk_sender(self, address):
         self.create_junk_sender_table_if_not_exists()
@@ -119,9 +133,7 @@ class SqliteSenderRepository:
         self.create_junk_sender_table_if_not_exists()
 
         try:
-            self.conn.execute(
-                f"""DELETE FROM junk_sender WHERE address = {address}"""
-            )
+            self.conn.execute(f"""DELETE FROM junk_sender WHERE address = {address}""")
             self.conn.commit()
         except Exception as e:
             self.conn.rollback()
@@ -145,3 +157,17 @@ class SqliteSenderRepository:
         except Exception as e:
             logger.error(f"{e} in CHECK JUNK operation for address {address}")
             return None
+
+    # Select addresses from junk sender
+    ## Return a set
+    def select_addresses_from_junk_sender(self):
+        self.connect_db_if_not()
+
+        try:
+            cursor = self.conn.execute(f"""SELECT * FROM junk_sender""")
+            records = cursor.fetchall()
+            return set(record[0] for record in records)
+
+        except Exception as e:
+            # logging.getLogger("stat").error(e)
+            return set()

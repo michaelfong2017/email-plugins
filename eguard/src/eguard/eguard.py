@@ -1,7 +1,7 @@
 from dependency_injector import containers
 import typer
 
-from .util.logger import create_logger
+from .util.logger import create_logger, create_stat_logger
 from .containers import Container
 from watchdog.observers import Observer
 import time
@@ -69,6 +69,7 @@ def main(
 
     # Logger
     logger = create_logger(debug=debug)
+    stat_logger = create_stat_logger()
 
     # Dependency injector
     container = Container()
@@ -122,11 +123,65 @@ def main(
 
     elif command == "fetchandbuild":
         print(container.user_dirs())
+
+        """
+        Collect statistics
+        """
+        repository = container.sender_repository()
+        """
+        Collect statistics END
+        """
+
+        """
+        Collect statistics
+        """
+        old_junk_set = repository.select_addresses_from_junk_sender()
+        """
+        Collect statistics END
+        """
+
         for user_dir in container.user_dirs():
             user = container.user_factory(user_dir)
+
+            """
+            Collect statistics
+            """
+            old_set = None
+            if os.path.isdir(user.cur_inbox_dir) or os.path.isdir(user.cur_junk_dir):
+                old_set = repository.select_addresses_from_known_sender(user.email)
+            """
+            Collect statistics END
+            """
+
             fetch_and_build_helper = container.fetch_and_build_helper_factory(user)
             fetch_and_build_helper.fetch_and_build_known_list()
             fetch_and_build_helper.fetch_and_build_junk_list()
+
+            """
+            Collect statistics
+            """
+            new_set = None
+            if os.path.isdir(user.cur_inbox_dir) or os.path.isdir(user.cur_junk_dir):
+                new_set = repository.select_addresses_from_known_sender(user.email)
+
+            # stat_logger.info(f"old_set: {old_set}")
+            # stat_logger.info(f"new_set: {new_set}")
+            if old_set is not None and new_set is not None:
+                diff_set = new_set - old_set
+                stat_logger.info(f"User {user.email}'s known sender list received {len(diff_set)} insertion(s) after fetchandbuild command.")
+            """
+            Collect statistics END
+            """
+
+        """
+        Collect statistics
+        """
+        new_junk_set = repository.select_addresses_from_junk_sender()
+        diff_junk_set = new_junk_set - old_junk_set
+        stat_logger.info(f"Junk sender list received {len(diff_junk_set)} insertion(s) after fetchandbuild command.")
+        """
+        Collect statistics END
+        """
 
     elif command == "updatebanners":
         for user_dir in container.user_dirs():
@@ -137,5 +192,7 @@ def main(
                 update_banners_helper.update_unknown_banners()
                 update_banners_helper.update_junk_banners()
                 update_banners_helper.update_no_banners()
+
+                stat_logger.info(f"updatebanners command is complete for user {user.email}.")
             else:
                 logger.warning(f"At least one of the directories \"{user.cur_inbox_dir}\" and \"{user.cur_junk_dir}\" does not exist. Ignore user \"{user.email}\" during {command}.")

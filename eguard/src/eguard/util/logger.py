@@ -40,8 +40,9 @@ def handler(
     filepath,
     level=logging.DEBUG,
     formatter=logging.Formatter("%(asctime)s - %(levelname)s - %(message)s"),
+    filemode="w",
 ):
-    fh = logging.FileHandler(filepath, "w")
+    fh = logging.FileHandler(filepath, filemode)
 
     def hong_kong(*args):
         utc_dt = utc.localize(datetime.utcnow())
@@ -76,3 +77,28 @@ File "{outer_frameinfo.filename}", {outer_frameinfo.function}:{outer_frameinfo.l
         return result
 
     return wrapped
+
+
+def create_stat_logger():
+    logger = logging.getLogger("stat")
+
+    logger.setLevel(logging.DEBUG)
+
+    ## Set logger.propagate to False so that events logged to this logger
+    ## will not be passed to the handlers of higher level (ancestor) loggers.
+    ## That is, in the current settings, we don't want logging.getLogger()
+    ## to receive logs from logging.getLogger("stat").
+    logger.propagate = False
+
+    if not len(logger.handlers) == 0:
+        logger.handlers.clear()
+
+    formatter = logging.Formatter(
+        "%(asctime)s - %(levelname)s - %(module)s:%(lineno)s [%(funcName)s] %(message)s"
+    )
+
+    logger.addHandler(
+        handler("logs/stat.log", level=logging.INFO, formatter=formatter, filemode="a")
+    )
+
+    return logger

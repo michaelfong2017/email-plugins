@@ -30,6 +30,7 @@ import threading
 
 
 logger = logging.getLogger()
+stat_logger = logging.getLogger("stat")
 
 
 """
@@ -123,12 +124,20 @@ class CurInboxEventHandler(FileSystemEventHandler):
             new_filename = mutable_email.get_filename()
 
             # Move junk mail to junk folder
-            move_to_folder(
+            new_filepath = move_to_folder(
                 self.user.cur_inbox_dir,
                 self.user.cur_junk_dir,
                 new_filename,
                 is_junk=True,
             )
+
+            """
+            Collect statistics
+            """
+            ## No need to collect statistics for junk here. Collect in CurJunkEventHandler instead.
+            """
+            Collect statistics END
+            """
 
         else:
             # If message is read ('S' for 'seen'), mark as recognized in database.
@@ -148,6 +157,16 @@ class CurInboxEventHandler(FileSystemEventHandler):
                         self.sender_repository.insert_address_to_known_sender(
                             self.user.email, address
                         )
+
+                        """
+                        Collect statistics
+                        """
+                        new_filepath = mutable_email.filepath
+                        if new_filepath:
+                            stat_logger.info(f"User {self.user.email}'s \"{filepath}\" is marked as read in the CurInbox directory. Therefore, it has all banners removed and is moved/renamed to \"{new_filepath}\" in the CurInbox directory.")
+                        """
+                        Collect statistics END
+                        """
 
                 t = threading.Timer(self.RECOGNIZE_LATER_TIMER, recognize_later)
                 # I tested that the thread will no longer be running after the scheduled
@@ -175,6 +194,16 @@ class CurInboxEventHandler(FileSystemEventHandler):
                 self.sender_repository.delete_address_from_known_sender(
                     self.user.email, address
                 )
+
+                """
+                Collect statistics
+                """
+                new_filepath = mutable_email.filepath
+                if new_filepath:
+                    stat_logger.info(f"User {self.user.email}'s \"{filepath}\" is marked as unread in the CurInbox directory. Therefore, it has unknown banners added and is moved/renamed to \"{new_filepath}\" in the CurInbox directory.")
+                """
+                Collect statistics END
+                """
 
         return super().on_any_event(event)
 
@@ -241,12 +270,20 @@ class NewInboxEventHandler(FileSystemEventHandler):
                 new_filename = mutable_email.get_filename()
 
                 # Move junk mail to junk folder
-                move_to_folder(
+                new_filepath = move_to_folder(
                     self.user.new_inbox_dir,
                     self.user.cur_junk_dir,
                     new_filename,
                     is_junk=True,
                 )
+
+                """
+                Collect statistics
+                """
+                ## No need to collect statistics for junk here. Collect in CurJunkEventHandler instead.
+                """
+                Collect statistics END
+                """
 
             # If the sender address is not in the junk list, check if it is in the known sender list
             else:
@@ -272,6 +309,16 @@ class NewInboxEventHandler(FileSystemEventHandler):
                     mutable_email = mutable_email.add_banners(
                         UNKNOWN_BANNER_PLAIN_TEXT, UNKNOWN_BANNER_HTML
                     )
+
+                    """
+                    Collect statistics
+                    """
+                    new_filepath = mutable_email.filepath
+                    if new_filepath:
+                        stat_logger.info(f"User {self.user.email}'s \"{filepath}\" is found to be from unknown sender and exists in the NewInbox directory. Therefore, it has unknown banners added and is moved/renamed to \"{new_filepath}\" in the NewInbox directory. It will later be automatically moved to the CurInbox directory.")
+                    """
+                    Collect statistics END
+                    """
 
         return super().on_any_event(event)
 
@@ -365,6 +412,16 @@ class CurJunkEventHandler(FileSystemEventHandler):
                 JUNK_BANNER_PLAIN_TEXT, JUNK_BANNER_HTML
             )
 
+            """
+            Collect statistics
+            """
+            new_filepath = mutable_email.filepath
+            if new_filepath:
+                stat_logger.info(f"User {self.user.email}'s \"{filepath}\" is marked as junk and arrives in the CurJunk directory. Therefore, it has junk banners added and is moved/renamed to \"{new_filepath}\" in the CurJunk directory.")
+            """
+            Collect statistics END
+            """
+
         elif isinstance(event, FileCreatedEvent):
             logger.info(f"{self.user.email} ; {self} ; {event}")
 
@@ -398,6 +455,16 @@ class CurJunkEventHandler(FileSystemEventHandler):
                 mutable_email = mutable_email.add_banners(
                     JUNK_BANNER_PLAIN_TEXT, JUNK_BANNER_HTML
                 )
+
+                """
+                Collect statistics
+                """
+                new_filepath = mutable_email.filepath
+                if new_filepath:
+                    stat_logger.info(f"User {self.user.email}'s \"{filepath}\" is marked as junk and arrives in the CurJunk directory. Therefore, it has junk banners added and is moved/renamed to \"{new_filepath}\" in the CurJunk directory.")
+                """
+                Collect statistics END
+                """
 
             ## Exclude case
             else:
@@ -453,12 +520,20 @@ class NewJunkEventHandler(FileSystemEventHandler):
             new_filename = mutable_email.get_filename()
 
             # Move junk mail to junk folder
-            move_to_folder(
+            new_filepath = move_to_folder(
                 self.user.new_junk_dir,
                 self.user.cur_junk_dir,
                 new_filename,
                 is_junk=True,
             )
+
+            """
+            Collect statistics
+            """
+            ## No need to collect statistics for junk here. Collect in CurJunkEventHandler instead.
+            """
+            Collect statistics END
+            """
 
         return super().on_any_event(event)
 

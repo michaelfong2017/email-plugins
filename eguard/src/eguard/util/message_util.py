@@ -46,6 +46,7 @@ def move_to_folder(src_dir, dest_dir, filename, is_junk=False):
                 os.path.join(src_dir, new_filename),
                 os.path.join(dest_dir, new_filename),
             )
+            return os.path.join(dest_dir, new_filename)
         except Exception as e:
             logger.error(e)
 
@@ -54,5 +55,6 @@ def move_to_folder(src_dir, dest_dir, filename, is_junk=False):
 
         try:
             shutil.move(os.path.join(src_dir, filename), dest_filepath)
+            return dest_filepath
         except Exception as e:
             logger.error(e)
