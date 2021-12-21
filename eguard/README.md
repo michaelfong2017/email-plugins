@@ -158,6 +158,7 @@ UNKNOWN_SUBJECT_BANNER = """[❗❗FROM NEW SENDER❗❗] """
 ## Run eguard
 - When new user email is registered or a user mail directory is removed, eguard has to be restarted. Reconfiguration of user
 directory paths before restart may be needed.
+- `duplicate session: eguard` is normal.
 
 ### Start eguard
 ```bash
