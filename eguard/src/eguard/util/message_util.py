@@ -4,6 +4,7 @@ import re
 import os
 import shutil
 import logging
+import ntpath
 
 logger = logging.getLogger()
 
@@ -58,3 +59,6 @@ def move_to_folder(src_dir, dest_dir, filename, is_junk=False):
             return dest_filepath
         except Exception as e:
             logger.error(e)
+
+def get_uid(filepath):
+    return ntpath.basename(filepath).split(".")[0]

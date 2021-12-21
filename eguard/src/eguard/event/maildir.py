@@ -26,6 +26,8 @@ from ..models.user_model import User
 from ..models.sender_repository import *
 from ..util.message_util import *
 import ntpath
+from pathlib import Path
+from shutil import copyfile
 import threading
 
 
@@ -96,6 +98,29 @@ class CurInboxEventHandler(FileSystemEventHandler):
         filepath = event.dest_path
         filename = ntpath.basename(filepath)
 
+        """
+        Backup email
+        """
+        try:
+            uid = get_uid(filepath=filepath)
+            if not self.sender_repository.is_uid_exists_in_backup_mail_list(
+                self.user.email, uid
+            ):
+                self.sender_repository.insert_uid_to_backup_mail_list(
+                    self.user.email, uid
+                )
+
+                dir = ntpath.dirname(ntpath.dirname(filepath))
+                backup_dir = os.path.join(dir, "backup")
+                backup_filepath = os.path.join(backup_dir, filename)
+                Path(backup_dir).mkdir(exist_ok=True)
+                copyfile(filepath, backup_filepath)
+        except Exception as e:
+            logger.error(e)
+        """
+        Backup email END
+        """
+
         flags = filename.split(",")[-1]
 
         # Find address from the message
@@ -163,7 +188,9 @@ class CurInboxEventHandler(FileSystemEventHandler):
                         """
                         new_filepath = mutable_email.filepath
                         if new_filepath:
-                            stat_logger.info(f"User {self.user.email}'s \"{filepath}\" is marked as read in the CurInbox directory. Therefore, it has all banners removed and is moved/renamed to \"{new_filepath}\" in the CurInbox directory.")
+                            stat_logger.info(
+                                f'User {self.user.email}\'s "{filepath}" is marked as read in the CurInbox directory. Therefore, it has all banners removed and is moved/renamed to "{new_filepath}" in the CurInbox directory.'
+                            )
                         """
                         Collect statistics END
                         """
@@ -200,7 +227,9 @@ class CurInboxEventHandler(FileSystemEventHandler):
                 """
                 new_filepath = mutable_email.filepath
                 if new_filepath:
-                    stat_logger.info(f"User {self.user.email}'s \"{filepath}\" is marked as unread in the CurInbox directory. Therefore, it has unknown banners added and is moved/renamed to \"{new_filepath}\" in the CurInbox directory.")
+                    stat_logger.info(
+                        f'User {self.user.email}\'s "{filepath}" is marked as unread in the CurInbox directory. Therefore, it has unknown banners added and is moved/renamed to "{new_filepath}" in the CurInbox directory.'
+                    )
                 """
                 Collect statistics END
                 """
@@ -247,6 +276,29 @@ class NewInboxEventHandler(FileSystemEventHandler):
         if event.event_type == "created":
             filepath = event.src_path
             filename = ntpath.basename(filepath)
+
+            """
+            Backup email
+            """
+            try:
+                uid = get_uid(filepath=filepath)
+                if not self.sender_repository.is_uid_exists_in_backup_mail_list(
+                    self.user.email, uid
+                ):
+                    self.sender_repository.insert_uid_to_backup_mail_list(
+                        self.user.email, uid
+                    )
+
+                    dir = ntpath.dirname(ntpath.dirname(filepath))
+                    backup_dir = os.path.join(dir, "backup")
+                    backup_filepath = os.path.join(backup_dir, filename)
+                    Path(backup_dir).mkdir(exist_ok=True)
+                    copyfile(filepath, backup_filepath)
+            except Exception as e:
+                logger.error(e)
+            """
+            Backup email END
+            """
 
             # Find address from the message
             address = find_address_from_message(filepath)
@@ -315,7 +367,9 @@ class NewInboxEventHandler(FileSystemEventHandler):
                     """
                     new_filepath = mutable_email.filepath
                     if new_filepath:
-                        stat_logger.info(f"User {self.user.email}'s \"{filepath}\" is found to be from unknown sender and exists in the NewInbox directory. Therefore, it has unknown banners added and is moved/renamed to \"{new_filepath}\" in the NewInbox directory. It will later be automatically moved to the CurInbox directory.")
+                        stat_logger.info(
+                            f'User {self.user.email}\'s "{filepath}" is found to be from unknown sender and exists in the NewInbox directory. Therefore, it has unknown banners added and is moved/renamed to "{new_filepath}" in the NewInbox directory. It will later be automatically moved to the CurInbox directory.'
+                        )
                     """
                     Collect statistics END
                     """
@@ -392,6 +446,29 @@ class CurJunkEventHandler(FileSystemEventHandler):
             filepath = event.dest_path
             filename = ntpath.basename(filepath)
 
+            """
+            Backup email
+            """
+            try:
+                uid = get_uid(filepath=filepath)
+                if not self.sender_repository.is_uid_exists_in_backup_mail_list(
+                    self.user.email, uid
+                ):
+                    self.sender_repository.insert_uid_to_backup_mail_list(
+                        self.user.email, uid
+                    )
+
+                    dir = ntpath.dirname(ntpath.dirname(filepath))
+                    backup_dir = os.path.join(dir, "backup")
+                    backup_filepath = os.path.join(backup_dir, filename)
+                    Path(backup_dir).mkdir(exist_ok=True)
+                    copyfile(filepath, backup_filepath)
+            except Exception as e:
+                logger.error(e)
+            """
+            Backup email END
+            """
+
             # Find address from the message
             address = find_address_from_message(filepath)
 
@@ -417,7 +494,9 @@ class CurJunkEventHandler(FileSystemEventHandler):
             """
             new_filepath = mutable_email.filepath
             if new_filepath:
-                stat_logger.info(f"User {self.user.email}'s \"{filepath}\" is marked as junk and arrives in the CurJunk directory. Therefore, it has junk banners added and is moved/renamed to \"{new_filepath}\" in the CurJunk directory.")
+                stat_logger.info(
+                    f'User {self.user.email}\'s "{filepath}" is marked as junk and arrives in the CurJunk directory. Therefore, it has junk banners added and is moved/renamed to "{new_filepath}" in the CurJunk directory.'
+                )
             """
             Collect statistics END
             """
@@ -461,7 +540,9 @@ class CurJunkEventHandler(FileSystemEventHandler):
                 """
                 new_filepath = mutable_email.filepath
                 if new_filepath:
-                    stat_logger.info(f"User {self.user.email}'s \"{filepath}\" is marked as junk and arrives in the CurJunk directory. Therefore, it has junk banners added and is moved/renamed to \"{new_filepath}\" in the CurJunk directory.")
+                    stat_logger.info(
+                        f'User {self.user.email}\'s "{filepath}" is marked as junk and arrives in the CurJunk directory. Therefore, it has junk banners added and is moved/renamed to "{new_filepath}" in the CurJunk directory.'
+                    )
                 """
                 Collect statistics END
                 """
@@ -503,6 +584,29 @@ class NewJunkEventHandler(FileSystemEventHandler):
         if event.event_type == "created":
             filepath = event.src_path
             filename = ntpath.basename(filepath)
+
+            """
+            Backup email
+            """
+            try:
+                uid = get_uid(filepath=filepath)
+                if not self.sender_repository.is_uid_exists_in_backup_mail_list(
+                    self.user.email, uid
+                ):
+                    self.sender_repository.insert_uid_to_backup_mail_list(
+                        self.user.email, uid
+                    )
+
+                    dir = ntpath.dirname(ntpath.dirname(filepath))
+                    backup_dir = os.path.join(dir, "backup")
+                    backup_filepath = os.path.join(backup_dir, filename)
+                    Path(backup_dir).mkdir(exist_ok=True)
+                    copyfile(filepath, backup_filepath)
+            except Exception as e:
+                logger.error(e)
+            """
+            Backup email END
+            """
 
             """
             Remove all previously added banner(s), if exists.

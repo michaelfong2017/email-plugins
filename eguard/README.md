@@ -255,5 +255,14 @@ For the working environment, VSCode together with VSCode extension `Remote - SSH
 example.sql contains examples of common database tasks that admin has to accomplish.
 
 ## Log
-This directory contains three log files that record logs in different logging level.
-Pass the --debug/-d flag to main.py to enable full logging.
+This directory contains four log files. Three of them record the main logs in different logging level.
+Pass the --debug/-d flag to main.py to enable full logging. The remaining one (stat.log) is for gathering statistics for eguard.
+
+## Backup
+Each email will be backed up before changes are applied to it. Each email has a unique uid and backup happens only when email of this uid has not been backed up before. Therefore, each email can only be backed up once unless the uid record in the `eguard.db` is deleted by administrator, which can be done if the administrator finds it necessary.
+
+For each email, its backup is found inside the `backup` folder which is inside its parent folder.
+For instance, relative to the user mail directory, if the email is inside `cur/`, its backup is inside `backup/`.
+For another instance, relative to the user mail directory, if the email is inside `.Junk/cur/`, its backup is inside `.Junk/backup/`.
+
+Each user has his/her own table in `eguard.db` that stores the list of emails that are already backed up.

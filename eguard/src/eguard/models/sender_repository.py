@@ -171,3 +171,51 @@ class SqliteSenderRepository:
         except Exception as e:
             # logging.getLogger("stat").error(e)
             return set()
+
+    """
+    List of backup mails
+    """
+    def create_backup_mail_list_table_if_not_exists(self, user_email):
+        self.connect_db_if_not()
+
+        try:
+            self.conn.execute(f"""SELECT count(*) FROM `{user_email}_backup_mail_list`""")
+
+        except (sqlite3.OperationalError) as e:
+            logger.info(f"{self}: create table `{user_email}_backup_mail_list` now.")
+            self.conn.execute(
+                f"""CREATE TABLE IF NOT EXISTS `{user_email}_backup_mail_list` (uid TEXT PRIMARY KEY NOT NULL)"""
+            )
+            self.conn.commit()
+
+    # Insert the uid to backup mail list
+    def insert_uid_to_backup_mail_list(self, user_email, uid):
+        self.create_backup_mail_list_table_if_not_exists(user_email)
+
+        try:
+            self.conn.execute(
+                f"""INSERT INTO `{user_email}_backup_mail_list` (uid) VALUES ({uid})"""
+            )
+            self.conn.commit()
+        except Exception as e:
+            self.conn.rollback()
+
+    # Find if uid exists in backup mail list
+    def is_uid_exists_in_backup_mail_list(self, user_email, uid):
+        self.create_backup_mail_list_table_if_not_exists(user_email)
+
+        try:
+            cursor = self.conn.execute(
+                f"""SELECT count(*) FROM `{user_email}_backup_mail_list` WHERE uid = {uid}"""
+            )
+            records = cursor.fetchall()
+            match_count = records[0][0]
+
+            if match_count == 0:
+                return False
+            else:
+                return True
+
+        except Exception as e:
+            logger.error(f"{e} in IS EXISTS operation for uid {uid}")
+            return None
