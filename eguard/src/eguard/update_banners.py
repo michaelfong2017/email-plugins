@@ -11,6 +11,10 @@ from .mutable_email import (
     MutableEmailFactory,
 )
 import os
+import ntpath
+from pathlib import Path
+from shutil import copyfile
+from .util.message_util import *
 
 
 class UpdateBannersHelper:
@@ -31,6 +35,31 @@ class UpdateBannersHelper:
             ) and not self.sender_repository.is_address_exists_in_known_sender(
                 self.user.email, address
             ):
+                """
+                Backup email
+                """
+                try:
+
+                    uid = get_uid(filepath=filepath)
+                    if not self.sender_repository.is_uid_exists_in_backup_mail_list(
+                        self.user.email, uid
+                    ):
+                        self.sender_repository.insert_uid_to_backup_mail_list(
+                            self.user.email, uid
+                        )
+
+                        dir = ntpath.dirname(ntpath.dirname(filepath))
+                        filename = ntpath.basename(filepath)
+                        backup_dir = os.path.join(dir, "backup")
+                        backup_filepath = os.path.join(backup_dir, filename)
+                        Path(backup_dir).mkdir(exist_ok=True)
+                        copyfile(filepath, backup_filepath)
+                except Exception as e:
+                    logger.error(e)
+                """
+                Backup email END
+                """
+
                 """
                 Remove all previously added banner(s), if exists.
                 """
@@ -53,6 +82,31 @@ class UpdateBannersHelper:
             address = find_address_from_message(filepath)
 
             if self.sender_repository.is_address_exists_in_junk_sender(address):
+                """
+                Backup email
+                """
+                try:
+
+                    uid = get_uid(filepath=filepath)
+                    if not self.sender_repository.is_uid_exists_in_backup_mail_list(
+                        self.user.email, uid
+                    ):
+                        self.sender_repository.insert_uid_to_backup_mail_list(
+                            self.user.email, uid
+                        )
+
+                        dir = ntpath.dirname(ntpath.dirname(filepath))
+                        filename = ntpath.basename(filepath)
+                        backup_dir = os.path.join(dir, "backup")
+                        backup_filepath = os.path.join(backup_dir, filename)
+                        Path(backup_dir).mkdir(exist_ok=True)
+                        copyfile(filepath, backup_filepath)
+                except Exception as e:
+                    logger.error(e)
+                """
+                Backup email END
+                """
+
                 """
                 Remove all previously added banner(s), if exists.
                 """
@@ -79,6 +133,31 @@ class UpdateBannersHelper:
             ) and self.sender_repository.is_address_exists_in_known_sender(
                 self.user.email, address
             ):
+                """
+                Backup email
+                """
+                try:
+
+                    uid = get_uid(filepath=filepath)
+                    if not self.sender_repository.is_uid_exists_in_backup_mail_list(
+                        self.user.email, uid
+                    ):
+                        self.sender_repository.insert_uid_to_backup_mail_list(
+                            self.user.email, uid
+                        )
+
+                        dir = ntpath.dirname(ntpath.dirname(filepath))
+                        filename = ntpath.basename(filepath)
+                        backup_dir = os.path.join(dir, "backup")
+                        backup_filepath = os.path.join(backup_dir, filename)
+                        Path(backup_dir).mkdir(exist_ok=True)
+                        copyfile(filepath, backup_filepath)
+                except Exception as e:
+                    logger.error(e)
+                """
+                Backup email END
+                """
+
                 """
                 Remove all previously added banner(s), if exists.
                 """

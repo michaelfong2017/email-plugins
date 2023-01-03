@@ -39,9 +39,9 @@ OLD_JUNK_BANNER_HTML = """<p style="margin: 10px 20%; text-align: center; border
 UNKNOWN_SUBJECT_BANNER = """[⚠️⚠️FROM NEW SENDER⚠️⚠️] """
 JUNK_SUBJECT_BANNER = """[❗❗JUNK MAIL❗❗] """
 UNKNOWN_BANNER_PLAIN_TEXT = OLD_UNKNOWN_BANNER_PLAIN_TEXT
-UNKNOWN_BANNER_HTML = OLD_UNKNOWN_BANNER_HTML
+UNKNOWN_BANNER_HTML = """<p style="margin: 10px 20%; text-align: center; border: 2px solid; background-color: #ff4444; padding: 5px;"><span>注意：<br />這是首次接收到的電郵地址。除非您確保其真確性，否則請留意當中所附有的超連結，附件或銀行帳戶資料。如有疑問，請尋求技術人員的支援。</span><br />CAUTION:<br/>The domain of email sender is first seen. &nbsp;Beware of any hyperlink, attachment and bank account information unless you ensure the authenticity of the sender. &nbsp;Seek IT assistance if in doubt.&nbsp;&nbsp;</p>\n"""
 JUNK_BANNER_PLAIN_TEXT = OLD_JUNK_BANNER_PLAIN_TEXT
-JUNK_BANNER_HTML = OLD_JUNK_BANNER_HTML
+JUNK_BANNER_HTML = """<p style="margin: 10px 20%; text-align: center; border: 2px solid; background-color: #ff7400; padding: 5px;"><span>注意：<br />這是曾被舉報為垃圾發件人的電郵地址。除非您確保其真確性，否則請留意當中所附有的超連結，附件或銀行帳戶資料。如有疑問，請尋求技術人員的支援。</span><br />WARNING:<br />The domain of email sender was reported as a junk sender. &nbsp;Beware of any hyperlink, attachment and bank account information unless you ensure the authenticity of the sender. &nbsp;Seek IT assistance if in doubt.&nbsp;&nbsp;</p>\n"""
 
 
 class MutableEmailFactory:

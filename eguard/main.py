@@ -59,6 +59,7 @@ def main():
                 "C-m",
             ]
         )
+        print("Either eguard has been started or an error occurs. Please read the log files or attach to the tmux window for outputs.")
 
     elif args.command == "restart":
         subprocess.Popen(
@@ -72,9 +73,11 @@ def main():
                 "C-m",
             ]
         )
+        print("Either eguard has been started or an error occurs. Please read the log files or attach to the tmux window for outputs.")
 
     elif args.command == "stop":
         subprocess.Popen(["tmux", "send-keys", "C-c"])
+        print("Eguard has been stopped.")
 
     elif args.command == "fetchandbuild":
         subprocess.Popen(
@@ -88,6 +91,7 @@ def main():
                 "C-m",
             ]
         )
+        print("Please read the log files or attach to the tmux window for outputs. Eguard has not been started. Please manually start/restart it.")
 
     elif args.command == "updatebanners":
         subprocess.Popen(
@@ -101,6 +105,7 @@ def main():
                 "C-m",
             ]
         )
+        print("Please read the log files or attach to the tmux window for outputs. Eguard has not been started. Please manually start/restart it.")
 
 
 if __name__ == "__main__":
